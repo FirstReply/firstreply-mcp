@@ -3,6 +3,23 @@
   "version": "0.1.0",
   "description": "MCP server exposing FirstReply customer support operations as tools",
   "license": "MIT",
+  "author": "FirstReply.ai",
+  "homepage": "https://firstreply.ai",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/FirstReply/firstreply-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/FirstReply/firstreply-mcp/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "firstreply",
+    "customer-support",
+    "ai",
+    "claude"
+  ],
   "type": "module",
   "bin": {
     "firstreply-mcp": "dist/index.js"
