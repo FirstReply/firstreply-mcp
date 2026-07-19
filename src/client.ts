@@ -40,6 +40,10 @@ export class FirstReplyClient {
     return this.send('PUT', path, body);
   }
 
+  delete(path: string): Promise<unknown> {
+    return this.send('DELETE', path);
+  }
+
   private withQuery(path: string, query?: Record<string, string | number | undefined>): string {
     if (!query) return path;
     const params = new URLSearchParams();

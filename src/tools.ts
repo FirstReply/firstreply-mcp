@@ -130,6 +130,53 @@ add(
 );
 
 // ---------------------------------------------------------------------------
+// API keys (organization admins only)
+// ---------------------------------------------------------------------------
+
+add(
+  'api_key_list',
+  'List the named API keys of an organization (name, masked prefix, created, last used, expiry). Never returns the key values. Requires organization admin permission.',
+  { organizationId: ORG_ID },
+  ['organizationId'],
+  READ,
+  (client, args) => client.get(`/v1/organizations/${str(args, 'organizationId')}/apiKeys`, { page: 1, limit: 50 }),
+);
+
+add(
+  'api_key_create',
+  'Create a new named API key for an organization. The response contains the plaintext key exactly once — relay it to the user immediately and treat it as a secret; it cannot be retrieved later. Requires organization admin permission.',
+  {
+    organizationId: ORG_ID,
+    name: STR('A descriptive name for the key, e.g. the integration that will use it.'),
+    expirationDays: NUM('Days until the key expires. Omit or 0 for a key that never expires.'),
+  },
+  ['organizationId', 'name'],
+  WRITE,
+  (client, args) =>
+    client.post(`/v1/organizations/${str(args, 'organizationId')}/apiKeys`, {
+      name: str(args, 'name'),
+      expirationDays: optNum(args, 'expirationDays') ?? 0,
+    }),
+);
+
+add(
+  'api_key_delete',
+  'Delete (revoke) an API key of an organization. Integrations using the key stop working immediately — including this MCP server if the key it authenticates with is deleted. Requires organization admin permission.',
+  {
+    organizationId: ORG_ID,
+    apiKeyId: STR('The id of the API key to delete (see api_key_list).'),
+  },
+  ['organizationId', 'apiKeyId'],
+  DESTRUCTIVE,
+  async (client, args) => {
+    await client.delete(
+      `/v1/organizations/${str(args, 'organizationId')}/apiKeys/${str(args, 'apiKeyId')}`,
+    );
+    return { success: true, message: 'API key deleted.' };
+  },
+);
+
+// ---------------------------------------------------------------------------
 // Conversations
 // ---------------------------------------------------------------------------
 

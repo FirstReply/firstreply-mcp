@@ -10,6 +10,9 @@ FirstReply customer support operations as tools for AI assistants like Claude.
 | `organization_list` | List accessible organizations |
 | `inbox_list` | List support inboxes of an organization |
 | `member_list` | List organization members |
+| `api_key_list` | List the organization's named API keys (metadata only) |
+| `api_key_create` | Create a named API key; plaintext returned once |
+| `api_key_delete` | Delete (revoke) an API key (destructive) |
 | `conversation_list` | List/filter customer conversations |
 | `conversation_get` | Get one conversation |
 | `conversation_messages` | List the messages of a conversation |
@@ -23,8 +26,10 @@ FirstReply customer support operations as tools for AI assistants like Claude.
 ## Authentication
 
 The server authenticates against the FirstReply REST API with an
-**organization API key** (`fr_...`), generated in FirstReply under
-Organization Settings → API Key. The key is sent as `Authorization: Bearer`.
+**organization API key** (`fr_...`), created in FirstReply under
+Organization → Development → API Keys. Organizations support multiple named
+keys with optional expiry, so it is best to create a dedicated key for this
+MCP server. The key is sent as `Authorization: Bearer`.
 
 ## Usage (stdio, e.g. Claude Desktop)
 
