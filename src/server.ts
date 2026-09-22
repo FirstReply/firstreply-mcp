@@ -3,24 +3,24 @@
  * (stdio via index.ts, stateless streamable HTTP via http-server.ts).
  */
 
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { CallToolRequestSchema, ErrorCode, ListToolsRequestSchema, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { createRequire } from 'node:module';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { FirstReplyApiError, FirstReplyClient } from './client.js';
 import { dispatchTool, TOOL_DEFINITIONS } from './tools.js';
 
+const { version } = createRequire(import.meta.url)('../../package.json') as { version: string };
+
 export const SERVER_NAME = 'firstreply-mcp';
-export const SERVER_VERSION = '0.1.0';
+export const SERVER_VERSION: string = version;
 
 export interface FirstReplyServerOptions {
   /** Bearer token: an organization API key ("fr_...") or user JWT. */
   token?: string;
 }
 
-export function createServer(options: FirstReplyServerOptions = {}): Server {
-  const server = new Server(
-    { name: SERVER_NAME, version: SERVER_VERSION },
-    { capabilities: { tools: {} } },
-  );
+export function createServer(options: FirstReplyServerOptions = {}): McpServer {
+  const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION });
 
   let client: FirstReplyClient | null = null;
   const getClient = (): FirstReplyClient => {
@@ -37,28 +37,34 @@ export function createServer(options: FirstReplyServerOptions = {}): Server {
     return client;
   };
 
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: TOOL_DEFINITIONS.map((tool) => ({ ...tool })),
-  }));
-
-  server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    const { name, arguments: args } = request.params;
-    try {
-      const result = await dispatchTool(getClient(), name, args ?? {});
-      if (result === null) {
-        throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
-      }
-      return {
-        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-      };
-    } catch (error) {
-      if (error instanceof McpError) throw error;
-      return {
-        content: [{ type: 'text', text: formatError(error) }],
-        isError: true,
-      };
-    }
-  });
+  for (const tool of TOOL_DEFINITIONS) {
+    server.registerTool(
+      tool.name,
+      {
+        title: tool.title,
+        description: tool.description,
+        inputSchema: tool.inputSchema,
+        annotations: tool.annotations,
+      },
+      async (args) => {
+        try {
+          const result = await dispatchTool(getClient(), tool.name, args);
+          if (result === null) {
+            throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${tool.name}`);
+          }
+          return {
+            content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+          };
+        } catch (error) {
+          if (error instanceof McpError) throw error;
+          return {
+            content: [{ type: 'text' as const, text: formatError(error) }],
+            isError: true,
+          };
+        }
+      },
+    );
+  }
 
   return server;
 }
