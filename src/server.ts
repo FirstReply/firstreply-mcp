@@ -1,11 +1,13 @@
 /**
  * FirstReply MCP server: one tool definition set, two transports
- * (stdio via index.ts, stateless streamable HTTP via http-server.ts).
+ * (stdio via index.ts, stateless HTTP via http-server.ts). Both serve protocol
+ * 2026-07-28 and the 2025-era revisions; createServer is the per-request (HTTP)
+ * or per-connection (stdio) factory the SDK calls.
  */
 
 import { createRequire } from 'node:module';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { McpServer, ProtocolError, ProtocolErrorCode } from '@modelcontextprotocol/server';
+import { z } from 'zod';
 import { FirstReplyApiError, FirstReplyClient } from './client.js';
 import { dispatchTool, TOOL_DEFINITIONS } from './tools.js';
 
@@ -27,8 +29,8 @@ export function createServer(options: FirstReplyServerOptions = {}): McpServer {
     if (!client) {
       const token = options.token ?? process.env.FIRSTREPLY_API_TOKEN;
       if (!token) {
-        throw new McpError(
-          ErrorCode.InternalError,
+        throw new ProtocolError(
+          ProtocolErrorCode.InternalError,
           'Authentication required: set the FIRSTREPLY_API_TOKEN environment variable to a FirstReply organization API key (fr_...). Generate one in FirstReply under Organization Settings.',
         );
       }
@@ -43,20 +45,20 @@ export function createServer(options: FirstReplyServerOptions = {}): McpServer {
       {
         title: tool.title,
         description: tool.description,
-        inputSchema: tool.inputSchema,
+        inputSchema: z.object(tool.inputSchema),
         annotations: tool.annotations,
       },
       async (args) => {
         try {
           const result = await dispatchTool(getClient(), tool.name, args);
           if (result === null) {
-            throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${tool.name}`);
+            throw new ProtocolError(ProtocolErrorCode.MethodNotFound, `Unknown tool: ${tool.name}`);
           }
           return {
             content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
           };
         } catch (error) {
-          if (error instanceof McpError) throw error;
+          if (error instanceof ProtocolError) throw error;
           return {
             content: [{ type: 'text' as const, text: formatError(error) }],
             isError: true,

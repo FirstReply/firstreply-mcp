@@ -3,19 +3,15 @@
  * stdio entry point for the FirstReply MCP server (Claude Desktop, CLIs).
  *
  * Usage: FIRSTREPLY_API_TOKEN=fr_... npx @firstreply/mcp
+ *
+ * serveStdio answers both protocol eras: a 2025-era `initialize` pins the
+ * connection to one server instance, a 2026-07-28 client is answered per request.
  */
 
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { serveStdio } from '@modelcontextprotocol/server/stdio';
 import { createServer } from './server.js';
 
-async function main(): Promise<void> {
-  const server = createServer();
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  console.error('FirstReply MCP server running on stdio');
-}
-
-main().catch((error) => {
-  console.error('Fatal error:', error);
-  process.exit(1);
+serveStdio(() => createServer(), {
+  onerror: (error) => console.error('[MCP] stdio:', error),
 });
+console.error('FirstReply MCP server running on stdio (protocol 2025-* and 2026-07-28)');

@@ -9,7 +9,7 @@
  */
 
 import { z } from 'zod';
-import type { ToolAnnotations } from '@modelcontextprotocol/sdk/types.js';
+import type { ToolAnnotations } from '@modelcontextprotocol/server';
 import type { FirstReplyClient } from '../client.js';
 
 export type ToolShape = z.ZodRawShape;

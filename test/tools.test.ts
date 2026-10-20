@@ -222,9 +222,6 @@ test('message_update only edits drafts and notes, and keeps HTML and text in syn
     message: 'Hi <you>\n\nThanks & bye',
   });
   assert.deepEqual(calls[1].body, {
-    outgoing: true,
-    positive: true,
-    opened: 0,
     subject: undefined,
     messagePlain: 'Hi <you>\n\nThanks & bye',
     messageHtml: '<p>Hi &lt;you&gt;</p><p>Thanks &amp; bye</p>',
@@ -236,6 +233,12 @@ test('message_update only edits drafts and notes, and keeps HTML and text in syn
     dispatchTool(client, 'message_update', { organizationId: 'org', messageId: 's1', message: 'x' }),
     /Only drafts and internal notes can be edited/,
   );
+});
+
+test('member_update sends only the permission', async () => {
+  const { client, calls } = fakeClient();
+  await dispatchTool(client, 'member_update', { organizationId: 'org', memberId: 'm1', permission: 2 });
+  assert.deepEqual(calls, [{ method: 'PUT', path: '/v1/organizations/org/members/m1', body: { permission: 2 } }]);
 });
 
 test('knowledge source tools never return the configuration', async () => {

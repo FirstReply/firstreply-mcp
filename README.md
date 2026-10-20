@@ -8,6 +8,9 @@ and translate replies, manage classifications, templates, prompts, webhooks and
 saved filters, pull support statistics and manage organization API keys, all
 scoped and permission-checked by the FirstReply REST API.
 
+The server speaks MCP protocol `2026-07-28` and the earlier `2025-*` revisions
+over stdio and HTTP, built on the v2 MCP TypeScript SDK.
+
 ## Tools
 
 Tools are named `resource_action`. Every organization-scoped tool takes an
@@ -136,7 +139,7 @@ import / export. Those stay in the FirstReply web app.
 
 ## Requirements
 
-- Node.js >= 18
+- Node.js >= 20
 - A FirstReply organization API key
 
 ## Authentication
@@ -150,6 +153,10 @@ MCP server. The key is sent as `Authorization: Bearer`.
 API key requests run with the permissions of the organization owner: treat
 the key as a secret and rotate it by creating a new key and deleting the old
 one.
+
+A key only reaches its own organization: `organization_list` returns just
+that organization, and requests for any other organization are refused with
+403. To work across several organizations, configure one server per key.
 
 ## Usage (stdio, e.g. Claude Desktop)
 
@@ -179,8 +186,10 @@ claude mcp add firstreply --env FIRSTREPLY_API_TOKEN=fr_... -- npx -y @firstrepl
 npm run build && npm run start:http   # listens on :8080
 ```
 
-Stateless streamable-HTTP transport; every request must carry
-`Authorization: Bearer fr_...`. A `/health` endpoint is provided for probes.
+Stateless: every request gets its own server instance, 2026-07-28 requests
+are answered directly and 2025-era clients over a stateless streamable-HTTP
+transport. Every request must carry `Authorization: Bearer fr_...`. A
+`/health` endpoint is provided for probes.
 
 ## Environment variables
 
@@ -205,14 +214,15 @@ npm run build     # compiles TypeScript to dist/
 ```
 src/
 ├── index.ts              # stdio entry point
-├── http-server.ts        # streamable-HTTP entry point (Express)
-├── server.ts             # MCP server wiring (McpServer + registerTool)
+├── http-server.ts        # HTTP entry point (Express + createMcpHandler)
+├── server.ts             # MCP server factory (McpServer + registerTool)
 ├── tools.ts              # loads the tool modules, exposes the registry
 ├── tools/registry.ts     # add() builder, schema helpers, dispatch
 ├── tools/<resource>.ts   # one module per resource (conversations, contacts, ...)
 └── client.ts             # minimal FirstReply REST client
 test/
-└── tools.test.ts         # tool definition checks and handler tests against a fake client
+├── tools.test.ts         # tool definition checks and handler tests against a fake client
+└── protocol.test.ts      # stdio and HTTP end to end, both protocol eras, against an API stub
 ```
 
 Adding a tool: call `add(name, description, zodShape, annotations, handler)`

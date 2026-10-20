@@ -7,7 +7,7 @@ import { add, DESTRUCTIVE, LIMIT, optStr, ORG_ID, orgPath, PAGE, paging, READ, s
 const WEBHOOK_ID = str('The webhook id (see webhook_list).');
 
 const EVENTS =
-  'Event name, or several comma-separated: conversation.create, conversation.update, conversation.delete, conversation.reassign, message.create, message.update, message.delete, contact.create, contact.update, contact.delete, knowledge.create, knowledge.update, knowledge.delete, classification.create, classification.update, classification.delete, template.create, template.update, template.delete, prompt.create, prompt.update, prompt.delete, inbox.create, inbox.update, inbox.delete, member.add, member.remove, organization.update.';
+  'Event name, or several comma-separated: conversation.create, conversation.update, conversation.delete, conversation.reassign, message.create, message.update, message.delete, contact.create, contact.update, contact.delete, contact_field.create, contact_field.update, contact_field.delete, conversation_filter.create, conversation_filter.update, conversation_filter.delete, knowledge.create, knowledge.update, knowledge.delete, knowledge_source.create, knowledge_source.update, knowledge_source.delete, classification.create, classification.update, classification.delete, template.create, template.update, template.delete, prompt.create, prompt.update, prompt.delete, inbox.create, inbox.update, inbox.delete, member.add, member.remove, organization.update.';
 
 const webhookPath = (organizationId: string, webhookId: string, suffix = ''): string =>
   orgPath(organizationId, `/webhooks/${webhookId}${suffix}`);

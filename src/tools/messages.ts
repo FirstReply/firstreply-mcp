@@ -40,21 +40,11 @@ add(
   WRITE,
   async (client, args) => {
     const path = messagePath(args.organizationId, args.messageId);
-    const current = (await client.get(path)) as {
-      draft?: boolean;
-      internal?: boolean;
-      outgoing: boolean;
-      positive: boolean;
-      opened: number;
-    };
+    const current = (await client.get(path)) as { draft?: boolean; internal?: boolean };
     if (!current.draft && !current.internal) {
       throw new Error('Only drafts and internal notes can be edited.');
     }
     return client.put(path, {
-      // Primitive flags of the update DTO would otherwise reset, so send the current values along.
-      outgoing: current.outgoing,
-      positive: current.positive,
-      opened: current.opened,
       subject: args.subject,
       messagePlain: args.message,
       messageHtml: args.message === undefined ? undefined : textToHtml(args.message),

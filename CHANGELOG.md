@@ -34,6 +34,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Built on the v2 MCP TypeScript SDK (`@modelcontextprotocol/server` and
+  `@modelcontextprotocol/node`) and speaks protocol `2026-07-28` as well as
+  the `2025-*` revisions, over stdio (`serveStdio`) and HTTP
+  (`createMcpHandler`, stateless for 2025-era clients). The HTTP server allows
+  the `Mcp-Method` and `Mcp-Name` headers in CORS preflights. Requires
+  Node.js 20 or higher.
 - `conversation_list` gained the contact, classification, language, spam and
   date range filters, documents the search operators and lets the API rank
   search results by relevance.
@@ -49,6 +55,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   server uses `McpServer.registerTool` instead of the deprecated low-level
   `Server` API. Tool modules live under `src/tools/`.
 - The server version is read from `package.json`.
+- `member_update` sends only the new permission and `message_update` only the
+  changed fields: the API keeps the values of fields left out of these
+  updates, so the tools no longer send the current flags back.
+- `organization_list` and the README say that an organization API key only
+  reaches its own organization (the API refuses other organizations with 403).
+- The webhook event list includes the `contact_field.*`,
+  `conversation_filter.*` and `knowledge_source.*` events.
 
 ### Fixed
 

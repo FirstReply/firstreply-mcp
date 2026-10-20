@@ -10,7 +10,7 @@ import { add, DESTRUCTIVE, num, optNum, optStr, ORG_ID, orgPath, READ, str, WRIT
 
 add(
   'organization_list',
-  'List the organizations the authenticated account can access, including ids, names and plans. Use the organizationId in all other tools.',
+  'List the organizations the token can access, including ids, names and plans: an organization API key sees only its own organization. Use the organizationId in all other tools.',
   {},
   READ,
   (client) => client.get('/v1/organizations', { sort: 'name', order: 'asc', page: 1, limit: 50 }),
@@ -100,12 +100,7 @@ add(
     permission: num(PERMISSION),
   },
   WRITE,
-  async (client, args) => {
-    const path = orgPath(args.organizationId, `/members/${args.memberId}`);
-    // The update DTO carries primitive flags that would otherwise reset, so send the current values along.
-    const current = (await client.get(path)) as { activated: boolean; deleted: boolean };
-    return client.put(path, { permission: args.permission, activated: current.activated, deleted: current.deleted });
-  },
+  (client, args) => client.put(orgPath(args.organizationId, `/members/${args.memberId}`), { permission: args.permission }),
 );
 
 add(
