@@ -18,6 +18,7 @@ import './tools/templates.js';
 import './tools/prompts.js';
 import './tools/webhooks.js';
 import './tools/filters.js';
+import './tools/posts.js';
 
 export { TOOL_DEFINITIONS, dispatchTool } from './tools/registry.js';
 export type { ToolDefinition } from './tools/registry.js';

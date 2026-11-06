@@ -251,3 +251,164 @@ test('knowledge source tools never return the configuration', async () => {
   const result = await dispatchTool(client, 'knowledge_source_list', { organizationId: 'org' });
   assert.deepEqual(result, { items: [{ id: 's1', name: 'Docs' }], count: 1 });
 });
+
+const inAnHour = (): string => new Date(Date.now() + 60 * 60 * 1000).toISOString();
+
+const scheduledPost = {
+  status: 'SCHEDULED',
+  content: 'Launch day',
+  timezone: 'Europe/Vienna',
+  scheduledAt: 1,
+  targets: [
+    { id: 't1', inboxId: 'fb', content: null, settings: null, status: 'SCHEDULED', views: 3 },
+    { id: 't2', inboxId: 'ig', content: 'Launch day #new', settings: '{"type":"feed"}', status: 'SCHEDULED' },
+  ],
+  media: [{ id: 'm1', altText: 'Screenshot', url: 'https://storage/signed', size: 10 }],
+};
+
+test('post_list maps its filters onto the query', async () => {
+  const { client, calls } = fakeClient();
+  await dispatchTool(client, 'post_list', {
+    organizationId: 'org',
+    status: 'SCHEDULED,PENDING_APPROVAL',
+    inboxId: 'fb',
+    from: '2026-11-01',
+    order: 'asc',
+    limit: 5,
+  });
+  assert.deepEqual(calls, [{
+    method: 'GET',
+    path: '/v1/organizations/org/posts',
+    body: {
+      status: 'SCHEDULED,PENDING_APPROVAL',
+      inboxId: 'fb',
+      from: Date.parse('2026-11-01'),
+      to: undefined,
+      search: undefined,
+      order: 'asc',
+      page: 1,
+      limit: 5,
+    },
+  }]);
+});
+
+test('post_create saves a draft on the given channels', async () => {
+  const { client, calls } = fakeClient();
+  await dispatchTool(client, 'post_create', { organizationId: 'org', content: 'Hello', inboxIds: ['fb', 'ig'] });
+  assert.deepEqual(calls, [{
+    method: 'POST',
+    path: '/v1/organizations/org/posts',
+    body: { content: 'Hello', timezone: undefined, status: 'DRAFT', targets: [{ inboxId: 'fb' }, { inboxId: 'ig' }] },
+  }]);
+});
+
+test('post_schedule creates a scheduled post, or schedules a draft keeping what stays', async () => {
+  const at = inAnHour();
+  const { client, calls } = fakeClient({
+    'GET /v1/organizations/org/posts/p1': { ...scheduledPost, status: 'DRAFT' },
+  });
+  await dispatchTool(client, 'post_schedule', { organizationId: 'org', content: 'New', inboxIds: ['fb'], scheduledAt: at });
+  assert.deepEqual(calls[0].body, {
+    content: 'New',
+    timezone: undefined,
+    status: 'SCHEDULED',
+    scheduledAt: Date.parse(at),
+    targets: [{ inboxId: 'fb' }],
+  });
+
+  await dispatchTool(client, 'post_schedule', { organizationId: 'org', postId: 'p1', inboxIds: ['ig', 'li'], scheduledAt: at });
+  assert.equal(calls[2].method, 'PUT');
+  assert.deepEqual(calls[2].body, {
+    content: 'Launch day',
+    timezone: 'Europe/Vienna',
+    targets: [{ inboxId: 'ig', content: 'Launch day #new', settings: '{"type":"feed"}' }, { inboxId: 'li' }],
+    media: [{ id: 'm1', altText: 'Screenshot' }],
+    status: 'SCHEDULED',
+    scheduledAt: Date.parse(at),
+  });
+
+  await assert.rejects(
+    dispatchTool(client, 'post_schedule', { organizationId: 'org', content: 'No channel', scheduledAt: at }),
+    /needs content and at least one inboxId/,
+  );
+});
+
+test('post_reschedule resends text, channels and media with the new time', async () => {
+  const at = inAnHour();
+  const { client, calls } = fakeClient({
+    'GET /v1/organizations/org/posts/p1': scheduledPost,
+    'GET /v1/organizations/org/posts/d1': { ...scheduledPost, status: 'DRAFT' },
+  });
+  await dispatchTool(client, 'post_reschedule', { organizationId: 'org', postId: 'p1', scheduledAt: at });
+  assert.deepEqual(calls[1], {
+    method: 'PUT',
+    path: '/v1/organizations/org/posts/p1',
+    body: {
+      content: 'Launch day',
+      timezone: 'Europe/Vienna',
+      targets: [
+        { inboxId: 'fb', content: null, settings: null },
+        { inboxId: 'ig', content: 'Launch day #new', settings: '{"type":"feed"}' },
+      ],
+      media: [{ id: 'm1', altText: 'Screenshot' }],
+      status: 'SCHEDULED',
+      scheduledAt: Date.parse(at),
+    },
+  });
+
+  // A draft only gets a new planned time.
+  await dispatchTool(client, 'post_reschedule', { organizationId: 'org', postId: 'd1', scheduledAt: at });
+  assert.equal((calls[3].body as { status: string }).status, 'DRAFT');
+});
+
+test('post scheduling refuses times that would publish right away', async () => {
+  const { client, calls } = fakeClient({ 'GET /v1/organizations/org/posts/p1': scheduledPost });
+  const soon = new Date(Date.now() + 2 * 60 * 1000).toISOString();
+  await assert.rejects(
+    dispatchTool(client, 'post_reschedule', { organizationId: 'org', postId: 'p1', scheduledAt: soon }),
+    /at least 10 minutes from now/,
+  );
+  await assert.rejects(
+    dispatchTool(client, 'post_schedule', { organizationId: 'org', content: 'x', inboxIds: ['fb'], scheduledAt: '2026-11-10T10:00:00' }),
+    /with UTC offset/,
+  );
+  assert.equal(calls.length, 0);
+});
+
+test('a post waiting for approval is not rescheduled with manager rights', async () => {
+  const pending = { ...scheduledPost, status: 'PENDING_APPROVAL' };
+  const manager = fakeClient({
+    'GET /v1/organizations/org/posts/p1': pending,
+    'GET /v1/organizations/org': { permission: 4 },
+  });
+  await assert.rejects(
+    dispatchTool(manager.client, 'post_reschedule', { organizationId: 'org', postId: 'p1', scheduledAt: inAnHour() }),
+    /waiting for approval/,
+  );
+  await assert.rejects(
+    dispatchTool(manager.client, 'post_schedule', { organizationId: 'org', postId: 'p1', scheduledAt: inAnHour() }),
+    /waiting for approval/,
+  );
+  assert.ok(!manager.calls.some((call) => call.method === 'PUT'));
+
+  // A member's save keeps it waiting for approval.
+  const member = fakeClient({
+    'GET /v1/organizations/org/posts/p1': pending,
+    'GET /v1/organizations/org': { permission: 1 },
+  });
+  await dispatchTool(member.client, 'post_reschedule', { organizationId: 'org', postId: 'p1', scheduledAt: inAnHour() });
+  assert.equal(member.calls[2].method, 'PUT');
+});
+
+test('no tool publishes, approves, retries or deletes a post', () => {
+  const postTools = TOOL_DEFINITIONS.filter((tool) => tool.name.startsWith('post_')).map((tool) => tool.name);
+  assert.deepEqual(postTools.sort(), [
+    'post_analytics',
+    'post_create',
+    'post_get',
+    'post_list',
+    'post_metrics',
+    'post_reschedule',
+    'post_schedule',
+  ]);
+});

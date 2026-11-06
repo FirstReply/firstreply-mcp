@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Social post tools: `post_list`, `post_get`, `post_metrics`, `post_create`
+  (draft), `post_schedule`, `post_reschedule` and `post_analytics`. There
+  is deliberately no tool to publish right away, approve, retry or delete a
+  post. Scheduled times must be at least 10 minutes ahead, and a post waiting
+  for approval is not rescheduled with manager rights, which would approve it.
+- Webhook events `post.create`, `post.update` (also when a post is
+  published or fails) and `post.delete` in the webhook tool descriptions.
+- `inbox_list` mentions `publishingEnabled`, the inboxes posts can target.
+
 ## [0.2.0] - 2026-10-20
 
 ### Added

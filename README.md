@@ -4,8 +4,9 @@ MCP ([Model Context Protocol](https://modelcontextprotocol.io)) server that expo
 [FirstReply](https://firstreply.ai) customer support operations as tools for AI
 assistants like Claude. It lets an assistant browse and answer customer
 conversations, look up contacts, search and maintain the knowledge base, draft
-and translate replies, manage classifications, templates, prompts, webhooks and
-saved filters, pull support statistics and manage organization API keys, all
+and translate replies, draft and schedule social media posts, manage
+classifications, templates, prompts, webhooks and saved filters, pull support
+and publishing statistics and manage organization API keys, all
 scoped and permission-checked by the FirstReply REST API.
 
 The server speaks MCP protocol `2026-07-28` and the earlier `2025-*` revisions
@@ -38,7 +39,7 @@ customer or delete data are annotated as destructive.
 
 | Tool | Description |
 |------|-------------|
-| `inbox_list` | List the inboxes (email, WhatsApp, Messenger, Instagram, LinkedIn, Google Play, App Store, website chat) |
+| `inbox_list` | List the inboxes (email, WhatsApp, Messenger, Instagram, LinkedIn, Google Play, App Store, website chat) and whether Publishing is on |
 | `inbox_get` | Get one inbox |
 | `inbox_statistics` | Statistics per inbox |
 | `inbox_refresh` | Fetch new messages from an inbox now |
@@ -84,6 +85,27 @@ understands the FirstReply search syntax: words are AND-ed and prefix matched,
 | `contact_delete` | Delete a contact (destructive) |
 | `contact_field_list` | List the custom contact fields |
 
+### Social posts
+
+| Tool | Description |
+|------|-------------|
+| `post_list` | List / filter posts (status, channel, period, text); `order: asc` for upcoming posts |
+| `post_get` | Get a post with its channels, publish state and latest metrics |
+| `post_metrics` | Metric snapshots of every channel of a published post |
+| `post_create` | Save a post as a draft |
+| `post_schedule` | Schedule a new post or an existing draft for a time on the given channels |
+| `post_reschedule` | Move a post to another time; text, channels and media stay |
+| `post_analytics` | Totals, daily series, top posts and channels for a period |
+
+Posts target inboxes with Publishing on (`publishingEnabled` in `inbox_list`).
+There is no tool to publish right away, approve, retry or delete a post: a
+public post cannot be taken back, so the assistant drafts or schedules and a
+person can still change it. Scheduled times have to be at least 10 minutes
+ahead. When the organization requires approval, a member's scheduled post
+waits for a manager (status `PENDING_APPROVAL`); such a post is not
+rescheduled with manager rights (an API key acts as the owner), since saving
+it would approve it.
+
 ### Classifications
 
 | Tool | Description |
@@ -128,14 +150,15 @@ Knowledge source configurations hold credentials and are never returned.
 |------|-------------|
 | `template_list` / `template_get` / `template_create` / `template_update` / `template_delete` | Reply templates and their language variants |
 | `prompt_list` / `prompt_get` / `prompt_create` / `prompt_update` / `prompt_delete` | Saved AI prompts |
-| `webhook_list` / `webhook_get` / `webhook_create` / `webhook_update` / `webhook_delete` | Webhooks and their events |
+| `webhook_list` / `webhook_get` / `webhook_create` / `webhook_update` / `webhook_delete` | Webhooks and their events (including `post.create`, `post.update`, `post.delete`) |
 | `webhook_test` | Send a test event to a webhook |
 | `webhook_rotate_secret` | Generate a new signing secret (returned once) |
 | `filter_list` / `filter_get` / `filter_create` / `filter_update` / `filter_delete` | Saved conversation filters |
 
 Not covered, by design: authentication and profile endpoints, inbox creation and
 OAuth connections, knowledge source creation, billing, attachments and CSV
-import / export. Those stay in the FirstReply web app.
+import / export, publishing posts right away, approving posts and media
+uploads. Those stay in the FirstReply web app.
 
 ## Requirements
 

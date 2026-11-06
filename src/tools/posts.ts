@@ -1,0 +1,232 @@
+/**
+ * Social posts: listing, drafting, scheduling and analytics.
+ *
+ * There are deliberately no tools to publish right away, approve, retry or delete:
+ * a public post cannot be taken back, so an assistant drafts or schedules and a
+ * person can still change the post in FirstReply before it goes out.
+ */
+
+import type { FirstReplyClient } from '../client.js';
+import {
+  add,
+  epochMillis,
+  LIMIT,
+  optDate,
+  optEnum,
+  optStr,
+  optStrList,
+  ORG_ID,
+  orgPath,
+  PAGE,
+  paging,
+  READ,
+  str,
+  WRITE,
+} from './registry.js';
+
+const POST_ID = str('The post id (see post_list).');
+const STATUSES = 'DRAFT, PENDING_APPROVAL, SCHEDULED, PUBLISHING, PUBLISHED, PARTIALLY_FAILED, FAILED';
+const INBOX_IDS = 'Ids of the inboxes (channels) to post to; only inboxes with publishingEnabled (see inbox_list).';
+const TIMEZONE = optStr('IANA time zone the post is planned in, e.g. Europe/Vienna. Shown in the calendar.');
+const SCHEDULED_AT = str(
+  'When to publish: ISO 8601 date-time with UTC offset, e.g. 2026-11-10T10:00:00+01:00. At least 10 minutes from now.',
+);
+const APPROVAL_NOTE =
+  'When the organization requires approval, a member\'s post waits for a manager (status PENDING_APPROVAL).';
+
+/** Scheduling closer than this would publish (almost) right away, before anyone could look at the post. */
+export const MIN_SCHEDULE_LEAD_MS = 10 * 60 * 1000;
+const PERMISSION_MANAGER = 2;
+
+interface Post {
+  status?: string;
+  content?: string;
+  timezone?: string;
+  targets?: { inboxId: string; content?: string | null; settings?: string | null }[];
+  media?: { id: string; altText?: string | null }[];
+}
+
+const postPath = (organizationId: string, postId = ''): string =>
+  orgPath(organizationId, `/posts${postId ? `/${postId}` : ''}`);
+
+/** The publish time in epoch millis, refused when it has no offset or is too soon. */
+function scheduleTime(value: string): number {
+  if (!/T\d{2}:\d{2}.*(Z|[+-]\d{2}:?\d{2})$/i.test(value)) {
+    throw new Error(`Invalid time "${value}": use an ISO 8601 date-time with UTC offset, e.g. 2026-11-10T10:00:00+01:00.`);
+  }
+  const millis = epochMillis(value) as number;
+  if (millis < Date.now() + MIN_SCHEDULE_LEAD_MS) {
+    throw new Error(
+      'The time must be at least 10 minutes from now: posts are only scheduled here, so the team can still check them. Publishing right away is done in FirstReply.',
+    );
+  }
+  return millis;
+}
+
+/**
+ * Saving a post that waits for approval as a manager (an API key acts as the owner)
+ * schedules it, which would approve it. Approving is left to a person.
+ */
+async function refuseImplicitApproval(client: FirstReplyClient, organizationId: string, post: Post): Promise<void> {
+  if (post.status !== 'PENDING_APPROVAL') return;
+  const organization = (await client.get(orgPath(organizationId))) as { permission?: number };
+  if (typeof organization.permission !== 'number' || organization.permission >= PERMISSION_MANAGER) {
+    throw new Error('This post is waiting for approval. Approve or change it in FirstReply.');
+  }
+}
+
+/** The post as the API takes it back: PUT replaces content, channels and media, so all of it is resent. */
+function postUpdate(post: Post, inboxIds?: string[]) {
+  const targets = (post.targets ?? []).map(({ inboxId, content, settings }) => ({ inboxId, content, settings }));
+  return {
+    content: post.content,
+    timezone: post.timezone,
+    targets: inboxIds ? inboxIds.map((inboxId) => targets.find((t) => t.inboxId === inboxId) ?? { inboxId }) : targets,
+    media: (post.media ?? []).map(({ id, altText }) => ({ id, altText })),
+  };
+}
+
+add(
+  'post_list',
+  'List the social media posts of an organization, newest first (order asc for upcoming posts, soonest first). Each post carries its text, status, scheduled time and its targets (one per channel) with their publish state and latest metrics.',
+  {
+    organizationId: ORG_ID,
+    status: optStr(`Filter by status, several comma-separated: ${STATUSES}.`),
+    inboxId: optStr('Only posts to this inbox (channel).'),
+    from: optDate('Only posts planned, published or created at or after this time.'),
+    to: optDate('Only posts planned, published or created before this time.'),
+    search: optStr('Text the post contains.'),
+    order: optEnum(['asc', 'desc'], 'asc lists the soonest first (calendar, upcoming posts); default desc.'),
+    page: PAGE,
+    limit: LIMIT,
+  },
+  READ,
+  (client, args) =>
+    client.get(postPath(args.organizationId), {
+      status: args.status,
+      inboxId: args.inboxId,
+      from: epochMillis(args.from),
+      to: epochMillis(args.to),
+      search: args.search,
+      order: args.order,
+      ...paging(args),
+    }),
+);
+
+add(
+  'post_get',
+  'Get a social media post by id: text, status, schedule, media and its targets (one per channel) with publish state, error, link to the published post and latest metrics.',
+  { organizationId: ORG_ID, postId: POST_ID },
+  READ,
+  (client, args) => client.get(postPath(args.organizationId, args.postId)),
+);
+
+add(
+  'post_metrics',
+  'Metric snapshots (views, reach, likes, comments, shares, saves, clicks) of every target of a published post, oldest first. A metric the platform does not offer is null.',
+  { organizationId: ORG_ID, postId: POST_ID },
+  READ,
+  (client, args) => client.get(postPath(args.organizationId, `${args.postId}/metrics`)),
+);
+
+add(
+  'post_create',
+  'Save a social media post as a draft. Nothing is published: schedule it with post_schedule or in FirstReply.',
+  {
+    organizationId: ORG_ID,
+    content: str('The text of the post.'),
+    inboxIds: optStrList(INBOX_IDS),
+    timezone: TIMEZONE,
+  },
+  WRITE,
+  (client, args) =>
+    client.post(postPath(args.organizationId), {
+      content: args.content,
+      timezone: args.timezone,
+      status: 'DRAFT',
+      targets: (args.inboxIds ?? []).map((inboxId) => ({ inboxId })),
+    }),
+);
+
+add(
+  'post_schedule',
+  `Schedule a social media post for a time: a new post from content and inboxIds, or an existing draft (postId; content and inboxIds then replace its text and channels). It is published at that time unless someone changes it in FirstReply. ${APPROVAL_NOTE}`,
+  {
+    organizationId: ORG_ID,
+    postId: optStr('An existing post to schedule. Omit to create a new post.'),
+    content: optStr('The text of the post. Required for a new post.'),
+    inboxIds: optStrList(`${INBOX_IDS} Required for a new post.`),
+    scheduledAt: SCHEDULED_AT,
+    timezone: TIMEZONE,
+  },
+  WRITE,
+  async (client, args) => {
+    const scheduledAt = scheduleTime(args.scheduledAt);
+    if (!args.postId) {
+      if (!args.content || !args.inboxIds?.length) {
+        throw new Error('A new post needs content and at least one inboxId.');
+      }
+      return client.post(postPath(args.organizationId), {
+        content: args.content,
+        timezone: args.timezone,
+        status: 'SCHEDULED',
+        scheduledAt,
+        targets: args.inboxIds.map((inboxId) => ({ inboxId })),
+      });
+    }
+    const path = postPath(args.organizationId, args.postId);
+    const post = (await client.get(path)) as Post;
+    await refuseImplicitApproval(client, args.organizationId, post);
+    const update = postUpdate(post, args.inboxIds?.length ? args.inboxIds : undefined);
+    return client.put(path, {
+      ...update,
+      content: args.content ?? update.content,
+      timezone: args.timezone ?? update.timezone,
+      status: 'SCHEDULED',
+      scheduledAt,
+    });
+  },
+);
+
+add(
+  'post_reschedule',
+  `Move a social media post to another time. Text, channels and media stay; a draft stays a draft with the new planned time. ${APPROVAL_NOTE}`,
+  {
+    organizationId: ORG_ID,
+    postId: POST_ID,
+    scheduledAt: SCHEDULED_AT,
+    timezone: TIMEZONE,
+  },
+  WRITE,
+  async (client, args) => {
+    const scheduledAt = scheduleTime(args.scheduledAt);
+    const path = postPath(args.organizationId, args.postId);
+    const post = (await client.get(path)) as Post;
+    await refuseImplicitApproval(client, args.organizationId, post);
+    const update = postUpdate(post);
+    return client.put(path, {
+      ...update,
+      timezone: args.timezone ?? update.timezone,
+      status: post.status === 'DRAFT' ? 'DRAFT' : 'SCHEDULED',
+      scheduledAt,
+    });
+  },
+);
+
+add(
+  'post_analytics',
+  'Publishing analytics for a period (default the last 30 days, at most a year): totals, a daily series, top posts and per-channel numbers with followers. A metric no channel offers is null.',
+  {
+    organizationId: ORG_ID,
+    from: optDate('Start of the period (posts published at or after it).'),
+    to: optDate('End of the period.'),
+    inboxId: optStr('Only this inbox (channel).'),
+  },
+  READ,
+  (client, args) =>
+    client.get(postPath(args.organizationId, 'analytics'), {
+      from: epochMillis(args.from),
+      to: epochMillis(args.to),
+      inboxId: args.inboxId,
+    }),
+);

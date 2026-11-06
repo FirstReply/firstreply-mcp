@@ -8,7 +8,7 @@ const INBOX_ID = str('The inbox id (see inbox_list).');
 
 add(
   'inbox_list',
-  'List the support inboxes of an organization: email, WhatsApp, Messenger, Instagram, LinkedIn, Google Play, App Store and website chat, with their type, name and health.',
+  'List the support inboxes of an organization: email, WhatsApp, Messenger, Instagram, LinkedIn, Google Play, App Store and website chat, with their type, name and health. publishingEnabled marks the social accounts posts can be published to (see post_schedule).',
   { organizationId: ORG_ID },
   READ,
   (client, args) => client.get(orgPath(args.organizationId, '/inboxes'), { page: 1, limit: 50 }),
