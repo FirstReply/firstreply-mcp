@@ -400,15 +400,59 @@ test('a post waiting for approval is not rescheduled with manager rights', async
   assert.equal(member.calls[2].method, 'PUT');
 });
 
+test('post_write returns the AI text without saving a post', async () => {
+  const { client, calls } = fakeClient({
+    'POST /v1/organizations/org/posts/ai': { text: 'Short and sweet', tooLong: false },
+  });
+  const result = await dispatchTool(client, 'post_write', {
+    organizationId: 'org',
+    action: 'SHORTEN',
+    text: 'A much longer launch announcement',
+    platform: 'X',
+    maxLength: 280,
+  });
+  assert.deepEqual(result, { text: 'Short and sweet', tooLong: false });
+  assert.deepEqual(calls, [{
+    method: 'POST',
+    path: '/v1/organizations/org/posts/ai',
+    body: {
+      action: 'SHORTEN',
+      text: 'A much longer launch announcement',
+      instruction: undefined,
+      platform: 'X',
+      maxLength: 280,
+      language: undefined,
+    },
+  }]);
+
+  await assert.rejects(
+    dispatchTool(client, 'post_write', { organizationId: 'org', action: 'PUBLISH', text: 'x' }),
+    /action:/,
+  );
+  assert.equal(calls.length, 1);
+});
+
+test('post_comments pages through the comment threads of a post', async () => {
+  const { client, calls } = fakeClient();
+  await dispatchTool(client, 'post_comments', { organizationId: 'org', postId: 'p1', limit: 20 });
+  assert.deepEqual(calls, [{
+    method: 'GET',
+    path: '/v1/organizations/org/posts/p1/conversations',
+    body: { page: 1, limit: 20 },
+  }]);
+});
+
 test('no tool publishes, approves, retries or deletes a post', () => {
   const postTools = TOOL_DEFINITIONS.filter((tool) => tool.name.startsWith('post_')).map((tool) => tool.name);
   assert.deepEqual(postTools.sort(), [
     'post_analytics',
+    'post_comments',
     'post_create',
     'post_get',
     'post_list',
     'post_metrics',
     'post_reschedule',
     'post_schedule',
+    'post_write',
   ]);
 });

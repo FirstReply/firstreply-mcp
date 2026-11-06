@@ -92,6 +92,8 @@ understands the FirstReply search syntax: words are AND-ed and prefix matched,
 | `post_list` | List / filter posts (status, channel, period, text); `order: asc` for upcoming posts |
 | `post_get` | Get a post with its channels, publish state and latest metrics |
 | `post_metrics` | Metric snapshots of every channel of a published post |
+| `post_comments` | The comment threads on a post, as conversations |
+| `post_write` | Write, shorten or rewrite a post text with AI, for a platform and a character limit; saves nothing |
 | `post_create` | Save a post as a draft |
 | `post_schedule` | Schedule a new post or an existing draft for a time on the given channels |
 | `post_reschedule` | Move a post to another time; text, channels and media stay |
@@ -104,7 +106,9 @@ person can still change it. Scheduled times have to be at least 10 minutes
 ahead. When the organization requires approval, a member's scheduled post
 waits for a manager (status `PENDING_APPROVAL`); such a post is not
 rescheduled with manager rights (an API key acts as the owner), since saving
-it would approve it.
+it would approve it. Comments are only read: hiding, deleting or liking a
+comment and answering it privately act publicly on the platform and stay in
+FirstReply.
 
 ### Classifications
 
@@ -157,8 +161,9 @@ Knowledge source configurations hold credentials and are never returned.
 
 Not covered, by design: authentication and profile endpoints, inbox creation and
 OAuth connections, knowledge source creation, billing, attachments and CSV
-import / export, publishing posts right away, approving posts and media
-uploads. Those stay in the FirstReply web app.
+import / export, publishing posts right away, approving posts, media
+uploads, comment moderation and private replies to comments. Those stay in the
+FirstReply web app.
 
 ## Requirements
 

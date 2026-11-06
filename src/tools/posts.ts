@@ -1,11 +1,13 @@
 /**
- * Social posts: listing, drafting, scheduling and analytics.
+ * Social posts: listing, writing with AI, drafting, scheduling, comment threads and analytics.
  *
  * There are deliberately no tools to publish right away, approve, retry or delete:
  * a public post cannot be taken back, so an assistant drafts or schedules and a
- * person can still change the post in FirstReply before it goes out.
+ * person can still change the post in FirstReply before it goes out. For the same
+ * reason comments are only read here, never moderated or answered privately.
  */
 
+import { z } from 'zod';
 import type { FirstReplyClient } from '../client.js';
 import {
   add,
@@ -13,6 +15,7 @@ import {
   LIMIT,
   optDate,
   optEnum,
+  optNum,
   optStr,
   optStrList,
   ORG_ID,
@@ -127,6 +130,42 @@ add(
   { organizationId: ORG_ID, postId: POST_ID },
   READ,
   (client, args) => client.get(postPath(args.organizationId, `${args.postId}/metrics`)),
+);
+
+add(
+  'post_comments',
+  'The comment threads on a published post, newest first. Each thread is a conversation (commenter as contact, status, classification, last message); read one with conversation_thread. Members see the threads they may see in the inbox.',
+  { organizationId: ORG_ID, postId: POST_ID, page: PAGE, limit: LIMIT },
+  READ,
+  (client, args) => client.get(postPath(args.organizationId, `${args.postId}/conversations`), paging(args)),
+);
+
+add(
+  'post_write',
+  'Write the text of a social media post with the organization\'s AI: WRITE a post from an instruction (facts come from the knowledge base), or SHORTEN or REWRITE a text. Returns the text, with tooLong when it still exceeds maxLength. Nothing is saved: pass the text to post_create or post_schedule.',
+  {
+    organizationId: ORG_ID,
+    action: z
+      .enum(['WRITE', 'SHORTEN', 'REWRITE'])
+      .describe('WRITE a new post from the instruction, SHORTEN or REWRITE the text.'),
+    instruction: optStr('WRITE: what the post is about. SHORTEN, REWRITE: how to change the text, e.g. "more casual".'),
+    text: optStr('The text to shorten or rewrite (required for SHORTEN and REWRITE); for WRITE an optional starting point.'),
+    platform: optStr(
+      'Type of the inbox the text is for (see inbox_list), e.g. MESSENGER (Facebook Page), INSTAGRAM or LINKEDIN. Omit for a text that works on several platforms.',
+    ),
+    maxLength: optNum('Character limit to stay within, e.g. 280 for X.'),
+    language: optStr('Two-letter language code. Default: the organization\'s language.'),
+  },
+  READ,
+  (client, args) =>
+    client.post(postPath(args.organizationId, 'ai'), {
+      action: args.action,
+      text: args.text,
+      instruction: args.instruction,
+      platform: args.platform,
+      maxLength: args.maxLength,
+      language: args.language,
+    }),
 );
 
 add(

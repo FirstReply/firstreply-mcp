@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Webhook events `post.create`, `post.update` (also when a post is
   published or fails) and `post.delete` in the webhook tool descriptions.
 - `inbox_list` mentions `publishingEnabled`, the inboxes posts can target.
+- `post_write`: writes a post from an instruction with the knowledge base,
+  or shortens or rewrites a text, for a platform and within a character limit.
+  It returns the text and saves nothing.
+- `post_comments`: the comment threads on a post, as conversations. There is
+  no tool to moderate a comment or answer it privately.
 
 ## [0.2.0] - 2026-10-20
 
