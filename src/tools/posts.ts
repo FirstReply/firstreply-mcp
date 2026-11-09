@@ -29,7 +29,7 @@ import {
 
 const POST_ID = str('The post id (see post_list).');
 const STATUSES = 'DRAFT, PENDING_APPROVAL, SCHEDULED, PUBLISHING, PUBLISHED, PARTIALLY_FAILED, FAILED';
-const INBOX_IDS = 'Ids of the inboxes (channels) to post to; only inboxes with publishingEnabled (see inbox_list).';
+const CHANNEL_IDS = 'Ids of the channels to post to; only channels with publishingEnabled (see channel_list).';
 const TIMEZONE = optStr('IANA time zone the post is planned in, e.g. Europe/Vienna. Shown in the calendar.');
 const SCHEDULED_AT = str(
   'When to publish: ISO 8601 date-time with UTC offset, e.g. 2026-11-10T10:00:00+01:00. At least 10 minutes from now.',
@@ -45,7 +45,7 @@ interface Post {
   status?: string;
   content?: string;
   timezone?: string;
-  targets?: { inboxId: string; content?: string | null; settings?: string | null }[];
+  targets?: { channelId: string; content?: string | null; settings?: string | null }[];
   media?: { id: string; altText?: string | null }[];
 }
 
@@ -79,12 +79,12 @@ async function refuseImplicitApproval(client: FirstReplyClient, organizationId: 
 }
 
 /** The post as the API takes it back: PUT replaces content, channels and media, so all of it is resent. */
-function postUpdate(post: Post, inboxIds?: string[]) {
-  const targets = (post.targets ?? []).map(({ inboxId, content, settings }) => ({ inboxId, content, settings }));
+function postUpdate(post: Post, channelIds?: string[]) {
+  const targets = (post.targets ?? []).map(({ channelId, content, settings }) => ({ channelId, content, settings }));
   return {
     content: post.content,
     timezone: post.timezone,
-    targets: inboxIds ? inboxIds.map((inboxId) => targets.find((t) => t.inboxId === inboxId) ?? { inboxId }) : targets,
+    targets: channelIds ? channelIds.map((channelId) => targets.find((t) => t.channelId === channelId) ?? { channelId }) : targets,
     media: (post.media ?? []).map(({ id, altText }) => ({ id, altText })),
   };
 }
@@ -95,7 +95,7 @@ add(
   {
     organizationId: ORG_ID,
     status: optStr(`Filter by status, several comma-separated: ${STATUSES}.`),
-    inboxId: optStr('Only posts to this inbox (channel).'),
+    channelId: optStr('Only posts to this channel.'),
     from: optDate('Only posts planned, published or created at or after this time.'),
     to: optDate('Only posts planned, published or created before this time.'),
     search: optStr('Text the post contains.'),
@@ -107,7 +107,7 @@ add(
   (client, args) =>
     client.get(postPath(args.organizationId), {
       status: args.status,
-      inboxId: args.inboxId,
+      channelId: args.channelId,
       from: epochMillis(args.from),
       to: epochMillis(args.to),
       search: args.search,
@@ -134,7 +134,7 @@ add(
 
 add(
   'post_comments',
-  'The comment threads on a published post, newest first. Each thread is a conversation (commenter as contact, status, classification, last message); read one with conversation_thread. Members see the threads they may see in the inbox.',
+  'The comment threads on a published post, newest first. Each thread is a conversation (commenter as contact, status, classification, last message); read one with conversation_thread. Members see the threads they may see in the channel.',
   { organizationId: ORG_ID, postId: POST_ID, page: PAGE, limit: LIMIT },
   READ,
   (client, args) => client.get(postPath(args.organizationId, `${args.postId}/conversations`), paging(args)),
@@ -151,7 +151,7 @@ add(
     instruction: optStr('WRITE: what the post is about. SHORTEN, REWRITE: how to change the text, e.g. "more casual".'),
     text: optStr('The text to shorten or rewrite (required for SHORTEN and REWRITE); for WRITE an optional starting point.'),
     platform: optStr(
-      'Type of the inbox the text is for (see inbox_list), e.g. MESSENGER (Facebook Page), INSTAGRAM or LINKEDIN. Omit for a text that works on several platforms.',
+      'Type of the channel the text is for (see channel_list), e.g. MESSENGER (Facebook Page), INSTAGRAM or LINKEDIN. Omit for a text that works on several platforms.',
     ),
     maxLength: optNum('Character limit to stay within, e.g. 280 for X.'),
     language: optStr('Two-letter language code. Default: the organization\'s language.'),
@@ -174,7 +174,7 @@ add(
   {
     organizationId: ORG_ID,
     content: str('The text of the post.'),
-    inboxIds: optStrList(INBOX_IDS),
+    channelIds: optStrList(CHANNEL_IDS),
     timezone: TIMEZONE,
   },
   WRITE,
@@ -183,18 +183,18 @@ add(
       content: args.content,
       timezone: args.timezone,
       status: 'DRAFT',
-      targets: (args.inboxIds ?? []).map((inboxId) => ({ inboxId })),
+      targets: (args.channelIds ?? []).map((channelId) => ({ channelId })),
     }),
 );
 
 add(
   'post_schedule',
-  `Schedule a social media post for a time: a new post from content and inboxIds, or an existing draft (postId; content and inboxIds then replace its text and channels). It is published at that time unless someone changes it in FirstReply. ${APPROVAL_NOTE}`,
+  `Schedule a social media post for a time: a new post from content and channelIds, or an existing draft (postId; content and channelIds then replace its text and channels). It is published at that time unless someone changes it in FirstReply. ${APPROVAL_NOTE}`,
   {
     organizationId: ORG_ID,
     postId: optStr('An existing post to schedule. Omit to create a new post.'),
     content: optStr('The text of the post. Required for a new post.'),
-    inboxIds: optStrList(`${INBOX_IDS} Required for a new post.`),
+    channelIds: optStrList(`${CHANNEL_IDS} Required for a new post.`),
     scheduledAt: SCHEDULED_AT,
     timezone: TIMEZONE,
   },
@@ -202,21 +202,21 @@ add(
   async (client, args) => {
     const scheduledAt = scheduleTime(args.scheduledAt);
     if (!args.postId) {
-      if (!args.content || !args.inboxIds?.length) {
-        throw new Error('A new post needs content and at least one inboxId.');
+      if (!args.content || !args.channelIds?.length) {
+        throw new Error('A new post needs content and at least one channelId.');
       }
       return client.post(postPath(args.organizationId), {
         content: args.content,
         timezone: args.timezone,
         status: 'SCHEDULED',
         scheduledAt,
-        targets: args.inboxIds.map((inboxId) => ({ inboxId })),
+        targets: args.channelIds.map((channelId) => ({ channelId })),
       });
     }
     const path = postPath(args.organizationId, args.postId);
     const post = (await client.get(path)) as Post;
     await refuseImplicitApproval(client, args.organizationId, post);
-    const update = postUpdate(post, args.inboxIds?.length ? args.inboxIds : undefined);
+    const update = postUpdate(post, args.channelIds?.length ? args.channelIds : undefined);
     return client.put(path, {
       ...update,
       content: args.content ?? update.content,
@@ -259,13 +259,13 @@ add(
     organizationId: ORG_ID,
     from: optDate('Start of the period (posts published at or after it).'),
     to: optDate('End of the period.'),
-    inboxId: optStr('Only this inbox (channel).'),
+    channelId: optStr('Only this channel.'),
   },
   READ,
   (client, args) =>
     client.get(postPath(args.organizationId, 'analytics'), {
       from: epochMillis(args.from),
       to: epochMillis(args.to),
-      inboxId: args.inboxId,
+      channelId: args.channelId,
     }),
 );

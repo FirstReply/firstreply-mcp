@@ -82,7 +82,7 @@ test('dispatchTool returns null for unknown tools', async () => {
 
 test('missing required argument produces a helpful error', async () => {
   const { client } = fakeClient();
-  await assert.rejects(dispatchTool(client, 'inbox_list', {}), /Missing required argument: organizationId/);
+  await assert.rejects(dispatchTool(client, 'channel_list', {}), /Missing required argument: organizationId/);
 });
 
 test('conversation_list maps its filters onto the search request', async () => {
@@ -90,7 +90,7 @@ test('conversation_list maps its filters onto the search request', async () => {
   await dispatchTool(client, 'conversation_list', {
     organizationId: 'org',
     status: 'open',
-    inboxId: 'inbox-1',
+    channelId: 'channel-1',
     createdAfter: '2026-09-01',
     search: 'invoice is:unassigned',
     limit: 5,
@@ -101,7 +101,7 @@ test('conversation_list maps its filters onto the search request', async () => {
     page: 1,
     limit: 5,
     status: 'open',
-    inboxIds: ['inbox-1'],
+    channelIds: ['channel-1'],
     memberIds: undefined,
     classificationIds: undefined,
     contactId: undefined,
@@ -199,7 +199,7 @@ test('filter_update merges criteria into the saved filter', async () => {
       name: 'Urgent',
       color: 2,
       arrangement: 4,
-      filter: { status: 'open', priority: 2, inboxIds: ['i1'] },
+      filter: { status: 'open', priority: 2, channelIds: ['i1'] },
     },
   });
   await dispatchTool(client, 'filter_update', { organizationId: 'org', filterId: 'f1', status: 'unread' });
@@ -207,7 +207,7 @@ test('filter_update merges criteria into the saved filter', async () => {
     name: 'Urgent',
     color: 2,
     arrangement: 4,
-    filter: { status: 'unread', priority: 2, inboxIds: ['i1'] },
+    filter: { status: 'unread', priority: 2, channelIds: ['i1'] },
   });
 });
 
@@ -260,8 +260,8 @@ const scheduledPost = {
   timezone: 'Europe/Vienna',
   scheduledAt: 1,
   targets: [
-    { id: 't1', inboxId: 'fb', content: null, settings: null, status: 'SCHEDULED', views: 3 },
-    { id: 't2', inboxId: 'ig', content: 'Launch day #new', settings: '{"type":"feed"}', status: 'SCHEDULED' },
+    { id: 't1', channelId: 'fb', content: null, settings: null, status: 'SCHEDULED', views: 3 },
+    { id: 't2', channelId: 'ig', content: 'Launch day #new', settings: '{"type":"feed"}', status: 'SCHEDULED' },
   ],
   media: [{ id: 'm1', altText: 'Screenshot', url: 'https://storage/signed', size: 10 }],
 };
@@ -271,7 +271,7 @@ test('post_list maps its filters onto the query', async () => {
   await dispatchTool(client, 'post_list', {
     organizationId: 'org',
     status: 'SCHEDULED,PENDING_APPROVAL',
-    inboxId: 'fb',
+    channelId: 'fb',
     from: '2026-11-01',
     order: 'asc',
     limit: 5,
@@ -281,7 +281,7 @@ test('post_list maps its filters onto the query', async () => {
     path: '/v1/organizations/org/posts',
     body: {
       status: 'SCHEDULED,PENDING_APPROVAL',
-      inboxId: 'fb',
+      channelId: 'fb',
       from: Date.parse('2026-11-01'),
       to: undefined,
       search: undefined,
@@ -294,11 +294,11 @@ test('post_list maps its filters onto the query', async () => {
 
 test('post_create saves a draft on the given channels', async () => {
   const { client, calls } = fakeClient();
-  await dispatchTool(client, 'post_create', { organizationId: 'org', content: 'Hello', inboxIds: ['fb', 'ig'] });
+  await dispatchTool(client, 'post_create', { organizationId: 'org', content: 'Hello', channelIds: ['fb', 'ig'] });
   assert.deepEqual(calls, [{
     method: 'POST',
     path: '/v1/organizations/org/posts',
-    body: { content: 'Hello', timezone: undefined, status: 'DRAFT', targets: [{ inboxId: 'fb' }, { inboxId: 'ig' }] },
+    body: { content: 'Hello', timezone: undefined, status: 'DRAFT', targets: [{ channelId: 'fb' }, { channelId: 'ig' }] },
   }]);
 });
 
@@ -307,21 +307,21 @@ test('post_schedule creates a scheduled post, or schedules a draft keeping what 
   const { client, calls } = fakeClient({
     'GET /v1/organizations/org/posts/p1': { ...scheduledPost, status: 'DRAFT' },
   });
-  await dispatchTool(client, 'post_schedule', { organizationId: 'org', content: 'New', inboxIds: ['fb'], scheduledAt: at });
+  await dispatchTool(client, 'post_schedule', { organizationId: 'org', content: 'New', channelIds: ['fb'], scheduledAt: at });
   assert.deepEqual(calls[0].body, {
     content: 'New',
     timezone: undefined,
     status: 'SCHEDULED',
     scheduledAt: Date.parse(at),
-    targets: [{ inboxId: 'fb' }],
+    targets: [{ channelId: 'fb' }],
   });
 
-  await dispatchTool(client, 'post_schedule', { organizationId: 'org', postId: 'p1', inboxIds: ['ig', 'li'], scheduledAt: at });
+  await dispatchTool(client, 'post_schedule', { organizationId: 'org', postId: 'p1', channelIds: ['ig', 'li'], scheduledAt: at });
   assert.equal(calls[2].method, 'PUT');
   assert.deepEqual(calls[2].body, {
     content: 'Launch day',
     timezone: 'Europe/Vienna',
-    targets: [{ inboxId: 'ig', content: 'Launch day #new', settings: '{"type":"feed"}' }, { inboxId: 'li' }],
+    targets: [{ channelId: 'ig', content: 'Launch day #new', settings: '{"type":"feed"}' }, { channelId: 'li' }],
     media: [{ id: 'm1', altText: 'Screenshot' }],
     status: 'SCHEDULED',
     scheduledAt: Date.parse(at),
@@ -329,7 +329,7 @@ test('post_schedule creates a scheduled post, or schedules a draft keeping what 
 
   await assert.rejects(
     dispatchTool(client, 'post_schedule', { organizationId: 'org', content: 'No channel', scheduledAt: at }),
-    /needs content and at least one inboxId/,
+    /needs content and at least one channelId/,
   );
 });
 
@@ -347,8 +347,8 @@ test('post_reschedule resends text, channels and media with the new time', async
       content: 'Launch day',
       timezone: 'Europe/Vienna',
       targets: [
-        { inboxId: 'fb', content: null, settings: null },
-        { inboxId: 'ig', content: 'Launch day #new', settings: '{"type":"feed"}' },
+        { channelId: 'fb', content: null, settings: null },
+        { channelId: 'ig', content: 'Launch day #new', settings: '{"type":"feed"}' },
       ],
       media: [{ id: 'm1', altText: 'Screenshot' }],
       status: 'SCHEDULED',
@@ -369,7 +369,7 @@ test('post scheduling refuses times that would publish right away', async () => 
     /at least 10 minutes from now/,
   );
   await assert.rejects(
-    dispatchTool(client, 'post_schedule', { organizationId: 'org', content: 'x', inboxIds: ['fb'], scheduledAt: '2026-11-10T10:00:00' }),
+    dispatchTool(client, 'post_schedule', { organizationId: 'org', content: 'x', channelIds: ['fb'], scheduledAt: '2026-11-10T10:00:00' }),
     /with UTC offset/,
   );
   assert.equal(calls.length, 0);

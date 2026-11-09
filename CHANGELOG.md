@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Inboxes are now called channels, as in the API: the tools `inbox_list`,
+  `inbox_get`, `inbox_statistics`, `inbox_refresh` and `inbox_test` are
+  `channel_list`, `channel_get`, `channel_statistics`, `channel_refresh` and
+  `channel_test`, and every `inboxId` / `inboxIds` argument and field is
+  `channelId` / `channelIds`. The webhook events `inbox.*` are `channel.*`.
+
 ### Added
 
 - Social post tools: `post_list`, `post_get`, `post_metrics`, `post_create`
@@ -16,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for approval is not rescheduled with manager rights, which would approve it.
 - Webhook events `post.create`, `post.update` (also when a post is
   published or fails) and `post.delete` in the webhook tool descriptions.
-- `inbox_list` mentions `publishingEnabled`, the inboxes posts can target.
+- `channel_list` mentions `publishingEnabled`, the channels posts can target.
 - `post_write`: writes a post from an instruction with the knowledge base,
   or shortens or rewrites a text, for a platform and within a character limit.
   It returns the text and saves nothing.

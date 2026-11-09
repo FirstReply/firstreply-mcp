@@ -6,7 +6,7 @@
  */
 
 import './tools/organizations.js';
-import './tools/inboxes.js';
+import './tools/channels.js';
 import './tools/conversations.js';
 import './tools/messages.js';
 import './tools/contacts.js';

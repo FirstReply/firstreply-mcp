@@ -56,7 +56,7 @@ add(
 
 add(
   'message_send',
-  'Send a draft message to the customer through the conversation\'s inbox. Irreversible: only call it after the user approved the draft (read it with message_get first).',
+  'Send a draft message to the customer through the conversation\'s channel. Irreversible: only call it after the user approved the draft (read it with message_get first).',
   { organizationId: ORG_ID, messageId: MESSAGE_ID },
   DESTRUCTIVE,
   (client, args) => client.post(messagePath(args.organizationId, args.messageId, '/send')),

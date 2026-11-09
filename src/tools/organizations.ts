@@ -49,7 +49,7 @@ add(
 
 add(
   'organization_usage',
-  'Plan and usage of an organization: plan name, trial / active / cancelled state, inbox and member counts against the plan limits.',
+  'Plan and usage of an organization: plan name, trial / active / cancelled state, channel and member counts against the plan limits.',
   { organizationId: ORG_ID },
   READ,
   (client, args) => client.get(orgPath(args.organizationId, '/usage')),

@@ -1,5 +1,5 @@
 /**
- * Saved conversation filters (the views in the inbox sidebar).
+ * Saved conversation filters (the views in the channel sidebar).
  */
 
 import {
@@ -22,7 +22,7 @@ import { SEARCH_SYNTAX } from './conversations.js';
 const FILTER_ID = str('The filter id (see filter_list).');
 
 const CRITERIA = {
-  inboxIds: optStrList('Inbox ids.'),
+  channelIds: optStrList('Channel ids.'),
   classificationIds: optStrList('Classification ids.'),
   memberIds: optStrList('Assigned member ids.'),
   status: optEnum(['unread', 'read', 'open', 'closed'], 'Status; "open" is unread + read.'),
@@ -36,7 +36,7 @@ const CRITERIA = {
 };
 
 interface Criteria {
-  inboxIds?: string[];
+  channelIds?: string[];
   classificationIds?: string[];
   memberIds?: string[];
   status?: string;
@@ -50,7 +50,7 @@ interface Criteria {
 }
 
 interface FilterBody {
-  inboxIds?: string[];
+  channelIds?: string[];
   classificationIds?: string[];
   memberIds?: string[];
   status?: string;
@@ -65,7 +65,7 @@ interface FilterBody {
 
 function toFilter(criteria: Criteria): FilterBody {
   return {
-    inboxIds: criteria.inboxIds,
+    channelIds: criteria.channelIds,
     classificationIds: criteria.classificationIds,
     memberIds: criteria.memberIds,
     status: criteria.status,
@@ -99,7 +99,7 @@ add(
 
 add(
   'filter_create',
-  'Save a conversation filter (a named view in the inbox). All criteria are optional and combine.',
+  'Save a conversation filter (a named view in the channel). All criteria are optional and combine.',
   {
     organizationId: ORG_ID,
     name: str('Name of the filter.'),

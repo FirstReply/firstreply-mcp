@@ -37,7 +37,7 @@ add(
   {
     organizationId: ORG_ID,
     status: optEnum(STATUS_VALUES, 'Filter by status; "open" is unread + read.'),
-    inboxId: optStr('Filter by inbox id.'),
+    channelId: optStr('Filter by channel id.'),
     assignedMemberId: optStr('Filter by assigned organization member id.'),
     contactId: optStr('Filter by contact id: the conversations of one customer.'),
     classificationId: optStr('Filter by classification id.'),
@@ -57,7 +57,7 @@ add(
     client.post(orgPath(args.organizationId, '/conversations/search'), {
       ...paging(args),
       status: args.status,
-      inboxIds: idList(args.inboxId),
+      channelIds: idList(args.channelId),
       memberIds: idList(args.assignedMemberId),
       classificationIds: idList(args.classificationId),
       contactId: args.contactId,
@@ -118,7 +118,7 @@ add(
 
 add(
   'conversation_reply',
-  'Send a reply to the customer in a conversation, delivered through the conversation\'s inbox (email, WhatsApp, ...). Sending is irreversible: only call it with a text the user has approved. Set internal=true to add an internal note visible to the team only, or draft=true to store a draft the team can review and send with message_send.',
+  'Send a reply to the customer in a conversation, delivered through the conversation\'s channel (email, WhatsApp, ...). Sending is irreversible: only call it with a text the user has approved. Set internal=true to add an internal note visible to the team only, or draft=true to store a draft the team can review and send with message_send.',
   {
     organizationId: ORG_ID,
     conversationId: CONVERSATION_ID,

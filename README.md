@@ -25,7 +25,7 @@ customer or delete data are annotated as destructive.
 | `organization_list` | List accessible organizations |
 | `organization_get` | Get an organization with its settings and AI prompts |
 | `organization_update` | Update name, language, auto-close and the custom AI prompts |
-| `organization_usage` | Plan, trial state and inbox / member counts against the limits |
+| `organization_usage` | Plan, trial state and channel / member counts against the limits |
 | `member_list` | List organization members |
 | `member_get` | Get one member |
 | `member_create` | Add a member by email with a permission level |
@@ -35,21 +35,21 @@ customer or delete data are annotated as destructive.
 | `api_key_create` | Create a named API key; plaintext returned once |
 | `api_key_delete` | Delete (revoke) an API key (destructive) |
 
-### Inboxes
+### Channels
 
 | Tool | Description |
 |------|-------------|
-| `inbox_list` | List the inboxes (email, WhatsApp, Messenger, Instagram, LinkedIn, Google Play, App Store, website chat) and whether Publishing is on |
-| `inbox_get` | Get one inbox |
-| `inbox_statistics` | Statistics per inbox |
-| `inbox_refresh` | Fetch new messages from an inbox now |
-| `inbox_test` | Test the connection of an inbox to its platform |
+| `channel_list` | List the channels (email, WhatsApp, Messenger, Instagram, LinkedIn, Google Play, App Store, website chat) and whether Publishing is on |
+| `channel_get` | Get one channel |
+| `channel_statistics` | Statistics per channel |
+| `channel_refresh` | Fetch new messages from a channel now |
+| `channel_test` | Test the connection of a channel to its platform |
 
 ### Conversations & messages
 
 | Tool | Description |
 |------|-------------|
-| `conversation_list` | List / filter / search conversations (status, inbox, member, contact, classification, language, spam, priority, date ranges, search operators) |
+| `conversation_list` | List / filter / search conversations (status, channel, member, contact, classification, language, spam, priority, date ranges, search operators) |
 | `conversation_get` | Get one conversation |
 | `conversation_thread` | Get a conversation with all of its messages |
 | `conversation_messages` | List the messages of a conversation |
@@ -99,7 +99,7 @@ understands the FirstReply search syntax: words are AND-ed and prefix matched,
 | `post_reschedule` | Move a post to another time; text, channels and media stay |
 | `post_analytics` | Totals, daily series, top posts and channels for a period |
 
-Posts target inboxes with Publishing on (`publishingEnabled` in `inbox_list`).
+Posts target channels with Publishing on (`publishingEnabled` in `channel_list`).
 There is no tool to publish right away, approve, retry or delete a post: a
 public post cannot be taken back, so the assistant drafts or schedules and a
 person can still change it. Scheduled times have to be at least 10 minutes
@@ -159,7 +159,7 @@ Knowledge source configurations hold credentials and are never returned.
 | `webhook_rotate_secret` | Generate a new signing secret (returned once) |
 | `filter_list` / `filter_get` / `filter_create` / `filter_update` / `filter_delete` | Saved conversation filters |
 
-Not covered, by design: authentication and profile endpoints, inbox creation and
+Not covered, by design: authentication and profile endpoints, channel creation and
 OAuth connections, knowledge source creation, billing, attachments and CSV
 import / export, publishing posts right away, approving posts, media
 uploads, comment moderation and private replies to comments. Those stay in the
