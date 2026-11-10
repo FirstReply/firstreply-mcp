@@ -1,5 +1,5 @@
 /**
- * Social posts: listing, writing with AI, drafting, scheduling, comment threads and analytics.
+ * Social posts: listing, writing with AI, media, drafting, scheduling, comment threads and analytics.
  *
  * There are deliberately no tools to publish right away, approve, retry or delete:
  * a public post cannot be taken back, so an assistant drafts or schedules and a
@@ -9,6 +9,7 @@
 
 import { z } from 'zod';
 import type { FirstReplyClient } from '../client.js';
+import { openRemoteFile, putStream } from '../media.js';
 import {
   add,
   epochMillis,
@@ -30,6 +31,38 @@ import {
 const POST_ID = str('The post id (see post_list).');
 const STATUSES = 'DRAFT, PENDING_APPROVAL, SCHEDULED, PUBLISHING, PUBLISHED, PARTIALLY_FAILED, FAILED';
 const CHANNEL_IDS = 'Ids of the channels to post to; only channels with publishingEnabled (see channel_list).';
+const SETTINGS_BY_PLATFORM = [
+  'INSTAGRAM: postType FEED (default), REELS or STORY; shareToFeed (Reels, default true).',
+  'X: threadParts, the texts of the posts after the first one of a thread.',
+  'YOUTUBE (one video): title (required, up to 100 characters), madeForKids (required, true or false), format VIDEO or SHORT, privacyStatus public, unlisted or private, categoryId, containsSyntheticMedia. The text is the description.',
+  'TIKTOK: privacyLevel (required, one the account offers, see channel_tiktok_creator_info), allowComment, allowDuet, allowStitch, commercialContent with yourBrand and/or brandedContent, title (photo posts), and musicUsageConfirmed true (required) plus brandedContentPolicyConfirmed true for branded content: set these two only after the user agreed to TikTok\'s Music Usage Confirmation and Branded Content Policy.',
+  'GOOGLE_BUSINESS: topicType STANDARD, EVENT or OFFER; actionType NONE, BOOK, ORDER, SHOP, LEARN_MORE, SIGN_UP or CALL with actionUrl; events and offers: eventTitle, startDate and endDate (YYYY-MM-DD), startTime and endTime (HH:mm); offers: couponCode, redeemUrl, terms.',
+  'MASTODON: visibility public, unlisted or private; spoilerText (content warning).',
+  'TELEGRAM: silent (no notification).',
+].join(' ');
+const TARGETS = z
+  .array(
+    z.object({
+      channelId: str('The channel to post to.'),
+      content: optStr('Text for this channel instead of the post\'s text, e.g. a shorter one for X.'),
+      settings: z.record(z.string(), z.unknown()).describe('Platform settings of this channel.').optional(),
+    }),
+  )
+  .describe(
+    `The channels to post to with their own text or platform settings, instead of channelIds; only channels with publishingEnabled (see channel_list). Settings by channel type: ${SETTINGS_BY_PLATFORM}`,
+  )
+  .optional();
+const MEDIA = z
+  .array(
+    z.object({
+      id: str('The media id from post_media_upload.'),
+      altText: optStr('Description of the image for people who cannot see it.'),
+    }),
+  )
+  .describe(
+    'Images or videos of the post, in order, uploaded with post_media_upload. Instagram, TikTok and YouTube need media; what each channel accepts is checked when the post is saved.',
+  )
+  .optional();
 const TIMEZONE = optStr('IANA time zone the post is planned in, e.g. Europe/Vienna. Shown in the calendar.');
 const SCHEDULED_AT = str(
   'When to publish: ISO 8601 date-time with UTC offset, e.g. 2026-11-10T10:00:00+01:00. At least 10 minutes from now.',
@@ -47,6 +80,23 @@ interface Post {
   timezone?: string;
   targets?: { channelId: string; content?: string | null; settings?: string | null }[];
   media?: { id: string; altText?: string | null }[];
+}
+
+interface TargetArgs {
+  channelIds?: string[];
+  targets?: { channelId: string; content?: string; settings?: Record<string, unknown> }[];
+}
+
+/** The targets as the API takes them (settings are a JSON string), undefined when none were given. */
+function targetsOf(args: TargetArgs): NonNullable<Post['targets']> | undefined {
+  if (args.targets?.length) {
+    return args.targets.map(({ channelId, content, settings }) => ({
+      channelId,
+      content,
+      settings: settings && Object.keys(settings).length ? JSON.stringify(settings) : undefined,
+    }));
+  }
+  return args.channelIds?.length ? args.channelIds.map((channelId) => ({ channelId })) : undefined;
 }
 
 const postPath = (organizationId: string, postId = ''): string =>
@@ -79,13 +129,20 @@ async function refuseImplicitApproval(client: FirstReplyClient, organizationId: 
 }
 
 /** The post as the API takes it back: PUT replaces content, channels and media, so all of it is resent. */
-function postUpdate(post: Post, channelIds?: string[]) {
+function postUpdate(post: Post, replace?: Post['targets'], media?: Post['media']) {
   const targets = (post.targets ?? []).map(({ channelId, content, settings }) => ({ channelId, content, settings }));
   return {
     content: post.content,
     timezone: post.timezone,
-    targets: channelIds ? channelIds.map((channelId) => targets.find((t) => t.channelId === channelId) ?? { channelId }) : targets,
-    media: (post.media ?? []).map(({ id, altText }) => ({ id, altText })),
+    // A channel given by id alone keeps the text and settings it has
+    targets: replace
+      ? replace.map((target) =>
+          target.content === undefined && target.settings === undefined
+            ? (targets.find((t) => t.channelId === target.channelId) ?? target)
+            : target,
+        )
+      : targets,
+    media: (media ?? post.media ?? []).map(({ id, altText }) => ({ id, altText })),
   };
 }
 
@@ -169,12 +226,42 @@ add(
 );
 
 add(
+  'post_media_upload',
+  'Upload an image or video for a post from a public https address (JPEG, PNG, WebP or GIF, MP4 or MOV, up to 1 GB; the address has to report the file size). Returns the media with its id: pass it as media to post_create or post_schedule. An upload no post uses is removed after a while.',
+  {
+    organizationId: ORG_ID,
+    url: str('Public https:// address of the file. Private or local addresses are refused.'),
+    fileName: optStr('File name to keep. Default: the last part of the address.'),
+    contentType: optStr('MIME type, e.g. image/jpeg or video/mp4. Default: what the address reports.'),
+    durationMs: optNum('Videos: the length in milliseconds, when known. The checks for Shorts and Reels use it.'),
+  },
+  { ...WRITE, openWorldHint: true },
+  async (client, args) => {
+    const file = await openRemoteFile(args.url);
+    try {
+      const upload = (await client.post(postPath(args.organizationId, 'media'), {
+        fileName: args.fileName ?? file.fileName,
+        contentType: args.contentType ?? file.contentType,
+        size: file.size,
+        durationMs: args.durationMs,
+      })) as { media: { id: string }; uploadUrl: string; uploadHeaders?: Record<string, string> };
+      await putStream(upload.uploadUrl, upload.uploadHeaders ?? {}, file.stream, file.size);
+      return await client.post(postPath(args.organizationId, `media/${upload.media.id}/complete`));
+    } finally {
+      file.stream.destroy();
+    }
+  },
+);
+
+add(
   'post_create',
   'Save a social media post as a draft. Nothing is published: schedule it with post_schedule or in FirstReply.',
   {
     organizationId: ORG_ID,
     content: str('The text of the post.'),
     channelIds: optStrList(CHANNEL_IDS),
+    targets: TARGETS,
+    media: MEDIA,
     timezone: TIMEZONE,
   },
   WRITE,
@@ -183,40 +270,45 @@ add(
       content: args.content,
       timezone: args.timezone,
       status: 'DRAFT',
-      targets: (args.channelIds ?? []).map((channelId) => ({ channelId })),
+      targets: targetsOf(args) ?? [],
+      ...(args.media ? { media: args.media } : {}),
     }),
 );
 
 add(
   'post_schedule',
-  `Schedule a social media post for a time: a new post from content and channelIds, or an existing draft (postId; content and channelIds then replace its text and channels). It is published at that time unless someone changes it in FirstReply. ${APPROVAL_NOTE}`,
+  `Schedule a social media post for a time: a new post from content and channelIds, or an existing draft (postId; content, channelIds or targets and media then replace its text, channels and media). It is published at that time unless someone changes it in FirstReply. ${APPROVAL_NOTE}`,
   {
     organizationId: ORG_ID,
     postId: optStr('An existing post to schedule. Omit to create a new post.'),
     content: optStr('The text of the post. Required for a new post.'),
-    channelIds: optStrList(`${CHANNEL_IDS} Required for a new post.`),
+    channelIds: optStrList(`${CHANNEL_IDS} Required for a new post, unless targets are given.`),
+    targets: TARGETS,
+    media: MEDIA,
     scheduledAt: SCHEDULED_AT,
     timezone: TIMEZONE,
   },
   WRITE,
   async (client, args) => {
     const scheduledAt = scheduleTime(args.scheduledAt);
+    const targets = targetsOf(args);
     if (!args.postId) {
-      if (!args.content || !args.channelIds?.length) {
-        throw new Error('A new post needs content and at least one channelId.');
+      if (!args.content || !targets) {
+        throw new Error('A new post needs content and at least one channel (channelIds or targets).');
       }
       return client.post(postPath(args.organizationId), {
         content: args.content,
         timezone: args.timezone,
         status: 'SCHEDULED',
         scheduledAt,
-        targets: args.channelIds.map((channelId) => ({ channelId })),
+        targets,
+        ...(args.media ? { media: args.media } : {}),
       });
     }
     const path = postPath(args.organizationId, args.postId);
     const post = (await client.get(path)) as Post;
     await refuseImplicitApproval(client, args.organizationId, post);
-    const update = postUpdate(post, args.channelIds?.length ? args.channelIds : undefined);
+    const update = postUpdate(post, targets, args.media);
     return client.put(path, {
       ...update,
       content: args.content ?? update.content,

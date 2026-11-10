@@ -17,6 +17,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Hosted server at `https://mcp.firstreply.ai/` (Dockerfile and Cloud Run
+  service definition).
+- Channel setup: `channel_create` (email, website chat, Bluesky, Telegram, App
+  Store, Google Play), `channel_connect` (the login link for accounts that
+  sign in on the platform, also to reconnect a channel or grant publishing),
+  `channel_update` (name, active, publishing, comment handling, settings and
+  credentials), `channel_playstore_service_account` and
+  `channel_tiktok_creator_info`. There is deliberately no tool to delete a
+  channel.
+- `post_create` and `post_schedule` take `targets` (a channel with its own
+  text and platform settings) and `media`; `post_media_upload` uploads an
+  image or video from a public https address.
 - Social post tools: `post_list`, `post_get`, `post_metrics`, `post_create`
   (draft), `post_schedule`, `post_reschedule` and `post_analytics`. There
   is deliberately no tool to publish right away, approve, retry or delete a
@@ -35,6 +47,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Hosted server at `https://mcp.firstreply.ai/` (Dockerfile and Cloud Run
+  service definition).
+- Channel setup: `channel_create` (email, website chat, Bluesky, Telegram, App
+  Store, Google Play), `channel_connect` (the login link for accounts that
+  sign in on the platform, also to reconnect a channel or grant publishing),
+  `channel_update` (name, active, publishing, comment handling, settings and
+  credentials), `channel_playstore_service_account` and
+  `channel_tiktok_creator_info`. There is deliberately no tool to delete a
+  channel.
+- `post_create` and `post_schedule` take `targets` (a channel with its own
+  text and platform settings) and `media`; `post_media_upload` uploads an
+  image or video from a public https address.
 - Organization tools: `organization_get`, `organization_update`,
   `organization_usage`, `member_get`, `member_create`, `member_update`,
   `member_delete`.
@@ -98,6 +122,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Hosted server at `https://mcp.firstreply.ai/` (Dockerfile and Cloud Run
+  service definition).
+- Channel setup: `channel_create` (email, website chat, Bluesky, Telegram, App
+  Store, Google Play), `channel_connect` (the login link for accounts that
+  sign in on the platform, also to reconnect a channel or grant publishing),
+  `channel_update` (name, active, publishing, comment handling, settings and
+  credentials), `channel_playstore_service_account` and
+  `channel_tiktok_creator_info`. There is deliberately no tool to delete a
+  channel.
+- `post_create` and `post_schedule` take `targets` (a channel with its own
+  text and platform settings) and `media`; `post_media_upload` uploads an
+  image or video from a public https address.
 - Initial release: MCP server (stdio and streamable-HTTP transports) exposing
   FirstReply customer support operations as tools.
 - Organization tools: `organization_list`, `inbox_list`, `member_list`.

@@ -39,11 +39,23 @@ customer or delete data are annotated as destructive.
 
 | Tool | Description |
 |------|-------------|
-| `channel_list` | List the channels (email, WhatsApp, Messenger, Instagram, LinkedIn, Google Play, App Store, website chat) and whether Publishing is on |
+| `channel_list` | List the channels (email, website chat, WhatsApp, Facebook Page, Instagram, LinkedIn, Threads, X, TikTok, YouTube, Google Business Profile, Bluesky, Mastodon, Telegram, Google Play, App Store) and whether Publishing is on |
 | `channel_get` | Get one channel |
 | `channel_statistics` | Statistics per channel |
 | `channel_refresh` | Fetch new messages from a channel now |
 | `channel_test` | Test the connection of a channel to its platform |
+| `channel_create` | Create a channel from settings or credentials: email, website chat, Bluesky, Telegram, App Store, Google Play |
+| `channel_connect` | Start connecting (or reconnecting) an account that signs in on the platform; returns the login link |
+| `channel_update` | Rename, pause, turn Publishing and comment handling on or off, change settings or credentials |
+| `channel_playstore_service_account` | The organization's Google service account to invite in the Play Console |
+| `channel_tiktok_creator_info` | What a TikTok channel may post right now (privacy levels, interactions, video length) |
+
+Facebook Pages, Instagram, LinkedIn, WhatsApp, Threads, X, TikTok, YouTube,
+Google Business Profile and Mastodon are connected by signing in on the
+platform. `channel_connect` returns the login link; the user opens it in a
+browser where they are signed in to FirstReply (as the organization's owner,
+which an API key acts as) and finishes there. The link is valid for 10
+minutes. There is no tool to delete a channel.
 
 ### Conversations & messages
 
@@ -94,12 +106,16 @@ understands the FirstReply search syntax: words are AND-ed and prefix matched,
 | `post_metrics` | Metric snapshots of every channel of a published post |
 | `post_comments` | The comment threads on a post, as conversations |
 | `post_write` | Write, shorten or rewrite a post text with AI, for a platform and a character limit; saves nothing |
-| `post_create` | Save a post as a draft |
+| `post_media_upload` | Upload an image or video from a public https address; returns the media id for a post |
+| `post_create` | Save a post as a draft, with media and per-channel text and settings |
 | `post_schedule` | Schedule a new post or an existing draft for a time on the given channels |
 | `post_reschedule` | Move a post to another time; text, channels and media stay |
 | `post_analytics` | Totals, daily series, top posts and channels for a period |
 
-Posts target channels with Publishing on (`publishingEnabled` in `channel_list`).
+Posts target channels with Publishing on (`publishingEnabled` in `channel_list`),
+given as `channelIds` or as `targets` with a text of their own and the
+platform's settings (YouTube title and made-for-kids choice, TikTok privacy
+level, Instagram post type, X thread parts, ...).
 There is no tool to publish right away, approve, retry or delete a post: a
 public post cannot be taken back, so the assistant drafts or schedules and a
 person can still change it. Scheduled times have to be at least 10 minutes
@@ -208,6 +224,16 @@ that organization, and requests for any other organization are refused with
 claude mcp add firstreply --env FIRSTREPLY_API_TOKEN=fr_... -- npx -y @firstreply/mcp
 ```
 
+## Usage (hosted)
+
+The server runs at `https://mcp.firstreply.ai/` (streamable HTTP). Send the
+organization API key as bearer token:
+
+```bash
+claude mcp add --transport http firstreply https://mcp.firstreply.ai/ \
+  --header "Authorization: Bearer fr_..."
+```
+
 ## Usage (HTTP)
 
 ```bash
@@ -247,6 +273,7 @@ src/
 ├── tools.ts              # loads the tool modules, exposes the registry
 ├── tools/registry.ts     # add() builder, schema helpers, dispatch
 ├── tools/<resource>.ts   # one module per resource (conversations, contacts, ...)
+├── media.ts              # fetches a public file and streams it to a signed upload URL
 └── client.ts             # minimal FirstReply REST client
 test/
 ├── tools.test.ts         # tool definition checks and handler tests against a fake client

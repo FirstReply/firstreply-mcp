@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { z } from 'zod';
 import { TOOL_DEFINITIONS, dispatchTool } from '../src/tools.js';
 import { FirstReplyClient } from '../src/client.js';
+import { isPublicAddress } from '../src/media.js';
 
 interface Call {
   method: string;
@@ -329,7 +330,7 @@ test('post_schedule creates a scheduled post, or schedules a draft keeping what 
 
   await assert.rejects(
     dispatchTool(client, 'post_schedule', { organizationId: 'org', content: 'No channel', scheduledAt: at }),
-    /needs content and at least one channelId/,
+    /needs content and at least one channel/,
   );
 });
 
@@ -450,9 +451,144 @@ test('no tool publishes, approves, retries or deletes a post', () => {
     'post_create',
     'post_get',
     'post_list',
+    'post_media_upload',
     'post_metrics',
     'post_reschedule',
     'post_schedule',
     'post_write',
   ]);
+});
+
+test('channel_create sends the given settings of the type', async () => {
+  const { client, calls } = fakeClient();
+  await dispatchTool(client, 'channel_create', {
+    organizationId: 'org',
+    type: 'BLUESKY',
+    name: 'Bluesky',
+    blueskyHandle: 'example.bsky.social',
+    blueskyAppPassword: 'abcd-efgh',
+    publishingEnabled: true,
+  });
+  assert.deepEqual(calls, [{
+    method: 'POST',
+    path: '/v1/organizations/org/channels',
+    body: {
+      type: 'BLUESKY',
+      name: 'Bluesky',
+      blueskyHandle: 'example.bsky.social',
+      blueskyAppPassword: 'abcd-efgh',
+      publishingEnabled: true,
+    },
+  }]);
+
+  // Accounts that sign in on the platform are not created from fields.
+  await assert.rejects(dispatchTool(client, 'channel_create', { organizationId: 'org', type: 'INSTAGRAM', name: 'x' }), /type:/);
+  assert.equal(calls.length, 1);
+});
+
+test('channel_connect returns the login link of a new channel or a reconnect, never the state', async () => {
+  const { client, calls } = fakeClient({
+    'POST /v1/organizations/org/channels/oauth/init': { authUrl: 'https://mastodon.social/oauth', state: 's1', provider: 'MASTODON' },
+    'POST /v1/organizations/org/channels/c1/oauth/reconnect': { authUrl: 'https://facebook.com/dialog', state: 's2' },
+  });
+  const created = (await dispatchTool(client, 'channel_connect', {
+    organizationId: 'org',
+    platform: 'MASTODON',
+    name: 'Mastodon',
+    server: 'mastodon.social',
+  })) as Record<string, unknown>;
+  assert.equal(created.authUrl, 'https://mastodon.social/oauth');
+  assert.ok(!('state' in created));
+  assert.deepEqual(calls[0].body, { platform: 'MASTODON', channelName: 'Mastodon', capabilities: undefined, server: 'mastodon.social' });
+
+  const reconnected = (await dispatchTool(client, 'channel_connect', {
+    organizationId: 'org',
+    channelId: 'c1',
+    capabilities: ['PUBLISHING'],
+  })) as Record<string, unknown>;
+  assert.equal(reconnected.authUrl, 'https://facebook.com/dialog');
+  assert.deepEqual(calls[1], {
+    method: 'POST',
+    path: '/v1/organizations/org/channels/c1/oauth/reconnect',
+    body: { capabilities: ['PUBLISHING'] },
+  });
+
+  await assert.rejects(dispatchTool(client, 'channel_connect', { organizationId: 'org', platform: 'X' }), /platform and name/);
+  assert.equal(calls.length, 2);
+});
+
+test('channel_update sends the stored channel back with the changes', async () => {
+  const { client, calls } = fakeClient({
+    'GET /v1/organizations/org/channels/c1': { id: 'c1', type: 'INSTAGRAM', name: 'Insta', instagramUserId: '42', publishingEnabled: false },
+  });
+  await dispatchTool(client, 'channel_update', { organizationId: 'org', channelId: 'c1', publishingEnabled: true, commentMode: 'QUESTIONS' });
+  assert.deepEqual(calls[1], {
+    method: 'PUT',
+    path: '/v1/organizations/org/channels/c1',
+    body: { id: 'c1', type: 'INSTAGRAM', name: 'Insta', instagramUserId: '42', publishingEnabled: true, commentMode: 'QUESTIONS' },
+  });
+});
+
+test('no tool deletes a channel', () => {
+  assert.ok(!TOOL_DEFINITIONS.some((tool) => tool.name === 'channel_delete'));
+});
+
+test('post_schedule takes targets with their own text and settings, and media', async () => {
+  const { client, calls } = fakeClient({
+    'GET /v1/organizations/org/posts/p1': {
+      status: 'DRAFT',
+      content: 'Old',
+      targets: [{ channelId: 'yt', content: 'Description', settings: '{"title":"Kept"}' }],
+      media: [{ id: 'm0' }],
+    },
+  });
+  const scheduledAt = new Date(Date.now() + 3_600_000).toISOString();
+  await dispatchTool(client, 'post_schedule', {
+    organizationId: 'org',
+    content: 'Launch',
+    targets: [
+      { channelId: 'yt', settings: { title: 'Launch video', madeForKids: false } },
+      { channelId: 'x', content: 'Short' },
+      { channelId: 'li' },
+    ],
+    media: [{ id: 'm1', altText: 'A rocket' }],
+    scheduledAt,
+  });
+  const created = calls[0].body as { targets: unknown; media: unknown; status: string };
+  assert.equal(created.status, 'SCHEDULED');
+  assert.deepEqual(created.targets, [
+    { channelId: 'yt', content: undefined, settings: '{"title":"Launch video","madeForKids":false}' },
+    { channelId: 'x', content: 'Short', settings: undefined },
+    { channelId: 'li', content: undefined, settings: undefined },
+  ]);
+  assert.deepEqual(created.media, [{ id: 'm1', altText: 'A rocket' }]);
+
+  // An existing draft: a channel given by id alone keeps its text and settings, media is replaced when given.
+  await dispatchTool(client, 'post_schedule', {
+    organizationId: 'org',
+    postId: 'p1',
+    targets: [{ channelId: 'yt' }, { channelId: 'x', content: 'Short' }],
+    scheduledAt,
+  });
+  const updated = calls[2].body as { targets: unknown; media: unknown };
+  assert.deepEqual(updated.targets, [
+    { channelId: 'yt', content: 'Description', settings: '{"title":"Kept"}' },
+    { channelId: 'x', content: 'Short', settings: undefined },
+  ]);
+  assert.deepEqual(updated.media, [{ id: 'm0', altText: undefined }]);
+});
+
+test('post_media_upload only fetches public https addresses', async () => {
+  const { client, calls } = fakeClient();
+  for (const url of ['http://example.com/a.jpg', 'https://127.0.0.1/a.jpg', 'https://[::1]/a.jpg', 'https://169.254.169.254/latest', 'https://localhost/a.jpg', 'file:///etc/passwd']) {
+    await assert.rejects(dispatchTool(client, 'post_media_upload', { organizationId: 'org', url }), /public|https/, url);
+  }
+  assert.equal(calls.length, 0);
+
+  for (const address of ['10.0.0.1', '172.16.5.4', '192.168.1.1', '100.64.0.1', '169.254.169.254', '0.0.0.0', '::1', 'fd00::1', 'fe80::1', '::ffff:10.0.0.1', '2002:a00:1::']) {
+    assert.equal(isPublicAddress(address), false, address);
+  }
+  for (const address of ['8.8.8.8', '172.32.0.1', '2a00:1450:4001::200e', '::ffff:8.8.8.8']) {
+    assert.equal(isPublicAddress(address), true, address);
+  }
 });
