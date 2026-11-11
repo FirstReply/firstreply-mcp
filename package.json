@@ -27,6 +27,7 @@
   "main": "dist/src/index.js",
   "files": [
     "dist/src",
+    "public",
     "README.md"
   ],
   "engines": {

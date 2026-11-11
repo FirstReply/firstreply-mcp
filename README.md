@@ -245,6 +245,9 @@ are answered directly and 2025-era clients over a stateless streamable-HTTP
 transport. Every request must carry `Authorization: Bearer fr_...`. A
 `/health` endpoint is provided for probes.
 
+A browser that opens the endpoint (`GET /` with `Accept: text/html`) gets the
+landing page from `public/`.
+
 ## Environment variables
 
 | Variable | Description |

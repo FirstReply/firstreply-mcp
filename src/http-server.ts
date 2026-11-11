@@ -9,6 +9,7 @@
  * MCP http server.
  */
 
+import { fileURLToPath } from 'node:url';
 import express from 'express';
 import type { Request, Response } from 'express';
 import { createMcpHandler } from '@modelcontextprotocol/server';
@@ -17,6 +18,8 @@ import { toNodeHandler } from '@modelcontextprotocol/node';
 import { createServer, SERVER_NAME, SERVER_VERSION } from './server.js';
 
 const PORT = Number(process.env.PORT ?? 8080);
+// The landing page and its logo (public/, next to dist/).
+const PUBLIC_DIR = fileURLToPath(new URL('../../public', import.meta.url));
 const ENDPOINT_PATH = process.env.MCP_ENDPOINT_PATH ?? '/';
 
 const mcpHandler = createMcpHandler(({ authInfo }) => createServer({ token: authInfo?.token }), {
@@ -73,13 +76,20 @@ app.post(ENDPOINT_PATH, async (req: Request, res: Response) => {
   await handleMcp(Object.assign(req, { auth }), res, req.body);
 });
 
-app.get(ENDPOINT_PATH, (_req: Request, res: Response) => {
+// A browser gets the landing page; an MCP client that tries to open a stream gets the 405.
+app.get(ENDPOINT_PATH, (req: Request, res: Response, next) => {
+  if (req.headers.accept?.includes('text/html')) {
+    next();
+    return;
+  }
   res.status(405).json({
     jsonrpc: '2.0',
     error: { code: -32000, message: 'Stateless server: use POST.' },
     id: null,
   });
 });
+
+app.use(express.static(PUBLIC_DIR, { maxAge: '1h' }));
 
 function extractBearerToken(header: string | undefined): string | null {
   if (!header) return null;

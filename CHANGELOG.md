@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- The HTTP server answers a browser's `GET /` with a landing page
+  (`public/index.html`): what the server does, example prompts and the setup
+  per client. MCP clients still get the 405 for `GET`.
+
 ## [0.3.0] - 2026-11-11
 
 ### Changed
