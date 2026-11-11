@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ReplyDraft` (edit, send or store the draft), `PostCard`, `PostAnalytics`
   and `ResultCard`. The tools linked to them return `structuredContent` next
   to the unchanged JSON text.
+- The landing page describes the sign-in and has setup tabs for Claude and
+  ChatGPT.
 - The HTTP server answers a browser's `GET /` with a landing page
   (`public/index.html`): what the server does, example prompts and the setup
   per client. MCP clients still get the 405 for `GET`.

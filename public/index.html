@@ -4,12 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>FirstReply MCP - Support and Social Publishing for AI Assistants</title>
-  <meta name="description" content="Connect your FirstReply organization to Claude, Cursor and other AI assistants. Answer customers, set up channels and schedule social posts in plain language.">
+  <meta name="description" content="Connect your FirstReply account to Claude, ChatGPT and other AI assistants. Answer customers, set up channels and schedule social posts in plain language.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://mcp.firstreply.ai/">
   <meta property="og:site_name" content="FirstReply">
   <meta property="og:title" content="FirstReply MCP - Support and Social Publishing for AI Assistants">
-  <meta property="og:description" content="Connect your FirstReply organization to Claude, Cursor and other AI assistants. Answer customers, set up channels and schedule social posts in plain language.">
+  <meta property="og:description" content="Connect your FirstReply account to Claude, ChatGPT and other AI assistants. Answer customers, set up channels and schedule social posts in plain language.">
   <meta property="og:image" content="https://firstreply.ai/img/preview-default.png">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:image" content="https://firstreply.ai/img/preview-default.png">
@@ -1335,7 +1335,7 @@
             from the chat
           </h1>
           <p class="hero-description">
-            Connect your FirstReply organization to Claude, Cursor and other AI assistants.
+            Connect your FirstReply account to Claude, ChatGPT and other AI assistants.
             Answer customers, set up channels and schedule posts in plain language.
           </p>
           <div class="hero-buttons">
@@ -1353,6 +1353,7 @@
             <p class="clients-label">Works with any MCP client</p>
             <ul class="client-list">
               <li><svg class="brand-claude" aria-hidden="true"><use href="#logo-claude"/></svg>Claude</li>
+              <li><svg aria-hidden="true"><use href="#logo-openai"/></svg>ChatGPT</li>
               <li><svg class="brand-claude" aria-hidden="true"><use href="#logo-claude"/></svg>Claude Code</li>
               <li><svg aria-hidden="true"><use href="#logo-cursor"/></svg>Cursor</li>
               <li><svg class="brand-vscode" aria-hidden="true"><use href="#logo-vscode"/></svg>VS Code</li>
@@ -1444,7 +1445,7 @@
           <article class="tile reveal" style="--d: 80ms">
             <span class="tile-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/></svg></span>
               <h3>Hosted or local</h3>
-              <p>Connect to mcp.firstreply.ai with an organization API key, or run the server yourself with npx.</p>
+              <p>Connect to mcp.firstreply.ai with your FirstReply sign-in or an API key, or run the server yourself with npx.</p>
               <ul class="tools"><li>mcp.firstreply.ai</li><li>npx @firstreply/mcp</li></ul>
           </article>
         </div>
@@ -1490,13 +1491,13 @@
         <ol class="steps" role="list">
           <li class="step reveal">
             <span class="step-num">01</span>
-            <h3>Create an API key</h3>
-            <p>In the web app under Organization Settings, API Keys. The key acts as the organization owner and only reaches that organization.</p>
+            <h3>Add FirstReply to your assistant</h3>
+            <p>The server address in Claude or ChatGPT, one command in Claude Code, or a short config in Claude Desktop, Cursor or VS Code.</p>
           </li>
           <li class="step reveal" style="--d: 80ms">
             <span class="step-num">02</span>
-            <h3>Add FirstReply to your assistant</h3>
-            <p>One command in Claude Code, or a short config in Claude Desktop, Cursor or VS Code.</p>
+            <h3>Sign in</h3>
+            <p>Allow the connection with your FirstReply account; the assistant then works with your permissions. Where a sign-in is not possible, use an API key from Organization Settings.</p>
           </li>
           <li class="step reveal" style="--d: 160ms">
             <span class="step-num">03</span>
@@ -1508,14 +1509,30 @@
         <div class="setup reveal">
           <div class="setup-tabs" role="tablist" aria-label="Choose your client">
             <button type="button" class="setup-tab" role="tab" id="setup-tab-code" aria-controls="setup-code" aria-selected="true"><svg class="brand-claude" aria-hidden="true"><use href="#logo-claude"/></svg>Claude Code</button>
+            <button type="button" class="setup-tab" role="tab" id="setup-tab-claude" aria-controls="setup-claude" aria-selected="false" tabindex="-1"><svg class="brand-claude" aria-hidden="true"><use href="#logo-claude"/></svg>Claude</button>
+            <button type="button" class="setup-tab" role="tab" id="setup-tab-chatgpt" aria-controls="setup-chatgpt" aria-selected="false" tabindex="-1"><svg aria-hidden="true"><use href="#logo-openai"/></svg>ChatGPT</button>
             <button type="button" class="setup-tab" role="tab" id="setup-tab-desktop" aria-controls="setup-desktop" aria-selected="false" tabindex="-1"><svg class="brand-claude" aria-hidden="true"><use href="#logo-claude"/></svg>Claude Desktop</button>
             <button type="button" class="setup-tab" role="tab" id="setup-tab-cursor" aria-controls="setup-cursor" aria-selected="false" tabindex="-1"><svg aria-hidden="true"><use href="#logo-cursor"/></svg>Cursor</button>
             <button type="button" class="setup-tab" role="tab" id="setup-tab-vscode" aria-controls="setup-vscode" aria-selected="false" tabindex="-1"><svg class="brand-vscode" aria-hidden="true"><use href="#logo-vscode"/></svg>VS Code</button>
           </div>
           <div class="setup-panel" role="tabpanel" id="setup-code" aria-labelledby="setup-tab-code">
-            <p>Run this in your terminal with your API key:</p>
+            <p>Run this in your terminal, then type <code>/mcp</code> in Claude Code and sign in with your FirstReply account:</p>
             <div class="code-block">
-              <code>claude mcp add --transport http firstreply https://mcp.firstreply.ai/ --header "Authorization: Bearer fr_your_api_key"</code>
+              <code>claude mcp add --transport http firstreply https://mcp.firstreply.ai/</code>
+              <button type="button" class="copy-btn" onclick="copyCode(this)">Copy</button>
+            </div>
+          </div>
+          <div class="setup-panel" role="tabpanel" id="setup-claude" aria-labelledby="setup-tab-claude" hidden>
+            <p>In Claude, open Settings, Connectors and add a custom connector with this address, then sign in with your FirstReply account:</p>
+            <div class="code-block">
+              <code><span class="url">https://mcp.firstreply.ai/</span></code>
+              <button type="button" class="copy-btn" onclick="copyCode(this)">Copy</button>
+            </div>
+          </div>
+          <div class="setup-panel" role="tabpanel" id="setup-chatgpt" aria-labelledby="setup-tab-chatgpt" hidden>
+            <p>In ChatGPT, add a connector in the settings with this address, then sign in with your FirstReply account:</p>
+            <div class="code-block">
+              <code><span class="url">https://mcp.firstreply.ai/</span></code>
               <button type="button" class="copy-btn" onclick="copyCode(this)">Copy</button>
             </div>
           </div>
@@ -1579,7 +1596,7 @@
         <div class="cta reveal">
           <p class="eyebrow">Get started</p>
           <h2>Run support and social from the chat <span class="accent">you already use.</span></h2>
-          <p class="cta-text">Create an API key, add the server to your assistant, and ask your first question.</p>
+          <p class="cta-text">Add the server to your assistant, sign in, and ask your first question.</p>
           <div class="hero-buttons">
             <a href="https://app.firstreply.ai" class="btn btn-primary">
               <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
