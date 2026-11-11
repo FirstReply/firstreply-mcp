@@ -3,10 +3,9 @@
 # the monorepo splits this subtree and pushes tag vX.Y.Z here, which is what
 # triggers the job below.
 #
-# PREREQUISITE: @firstreply/mcp has never been published. Before the first
-# release, either configure npm trusted publishing (OIDC) for this repo, or
-# replace the OIDC step with an NPM_TOKEN secret. Until then this job fails
-# at the publish step and nothing else is affected.
+# Publishing uses npm trusted publishing (OIDC): the package's settings on
+# npmjs.com trust this repository and this workflow file, so there is no npm
+# token. It needs npm 11.5.1 or newer, which Node 24 brings.
 name: Publish package
 
 on:
@@ -26,7 +25,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '24'
           registry-url: 'https://registry.npmjs.org'
 
       # Guard: the tag must match the version npm will publish.
