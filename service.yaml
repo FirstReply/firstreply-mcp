@@ -41,3 +41,6 @@ spec:
               value: "/"
             - name: FIRSTREPLY_API_URL
               value: "https://api.firstreply.ai"
+            # The OAuth resource identifier MCP hosts sign in for; the API accepts tokens for it
+            - name: MCP_SERVER_URL
+              value: "https://mcp.firstreply.ai"

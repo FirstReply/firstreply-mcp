@@ -1,0 +1,141 @@
+/*
+ * Every --fr-* token resolves to the host's own variable when the host provides one (MCP Apps
+ * host styles) and falls back to a light-dark() pair otherwise. Never define a host variable
+ * name (--color-*, --font-*, --border-radius-*) here: the host owns them.
+ */
+:root {
+  color-scheme: light dark;
+  --fr-font: var(--font-sans, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif);
+  --fr-mono: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+  --fr-fg: var(--color-text-primary, light-dark(#18181b, #fafafa));
+  --fr-fg-muted: var(--color-text-secondary, light-dark(#52525b, #a1a1aa));
+  --fr-bg: var(--color-background-primary, light-dark(#ffffff, #131315));
+  --fr-bg-muted: var(--color-background-secondary, light-dark(#f4f4f5, #1c1c1f));
+  --fr-border: var(--color-border-primary, light-dark(rgb(0 0 0 / 0.1), rgb(255 255 255 / 0.1)));
+  --fr-success: var(--color-text-success, light-dark(#15803d, #4ade80));
+  --fr-success-bg: var(--color-background-success, light-dark(#dcfce7, rgb(34 197 94 / 0.15)));
+  --fr-warning: var(--color-text-warning, light-dark(#975a06, #fbbf24));
+  --fr-warning-bg: var(--color-background-warning, light-dark(#fef3c7, rgb(251 191 36 / 0.12)));
+  --fr-danger: var(--color-text-danger, light-dark(#b91c1c, #f87171));
+  --fr-danger-bg: var(--color-background-danger, light-dark(#fee2e2, rgb(239 68 68 / 0.12)));
+  --fr-accent: light-dark(#6657e8, #7a6bf9);
+  --fr-accent-text: light-dark(#5647d6, #b4acfc);
+  --fr-accent-bg: light-dark(#eeecfe, rgb(122 107 249 / 0.14));
+  --fr-accent-border: light-dark(rgb(102 87 232 / 0.3), rgb(122 107 249 / 0.35));
+  --fr-radius: var(--border-radius-md, 8px);
+  --fr-radius-card: var(--border-radius-xl, 14px);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: var(--fr-font);
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--fr-fg);
+  /* The host draws the surface around the widget */
+  background: transparent;
+  -webkit-font-smoothing: antialiased;
+}
+
+h2, h3, p, ul, ol { margin: 0; padding: 0; }
+ul, ol { list-style: none; }
+:focus-visible { outline: 2px solid var(--fr-accent-text); outline-offset: 2px; }
+
+.fr-card {
+  border: 1px solid var(--fr-border);
+  border-radius: var(--fr-radius-card);
+  background: var(--fr-bg);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-wrap: anywhere;
+}
+.fr-card-accent { border-color: var(--fr-accent-border); }
+.fr-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.fr-title { font-size: 15px; font-weight: 600; }
+.fr-muted { color: var(--fr-fg-muted); font-size: 13px; }
+.fr-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.fr-grow { flex: 1; min-width: 0; }
+.fr-text { white-space: pre-wrap; }
+
+.fr-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: 100px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  background: var(--fr-bg-muted);
+  color: var(--fr-fg-muted);
+}
+.fr-badge-accent { background: var(--fr-accent-bg); color: var(--fr-accent-text); }
+.fr-badge-success { background: var(--fr-success-bg); color: var(--fr-success); }
+.fr-badge-warning { background: var(--fr-warning-bg); color: var(--fr-warning); }
+.fr-badge-danger { background: var(--fr-danger-bg); color: var(--fr-danger); }
+
+.fr-button {
+  font: inherit;
+  font-weight: 500;
+  padding: 7px 14px;
+  border-radius: var(--fr-radius);
+  border: 1px solid var(--fr-border);
+  background: var(--fr-bg);
+  color: var(--fr-fg);
+  cursor: pointer;
+}
+.fr-button:hover:not(:disabled) { background: var(--fr-bg-muted); }
+.fr-button:disabled { opacity: 0.55; cursor: default; }
+.fr-button-primary { background: var(--fr-accent); border-color: transparent; color: #fff; }
+.fr-button-primary:hover:not(:disabled) { background: var(--fr-accent); filter: brightness(1.08); }
+
+.fr-list > li { padding: 10px 0; border-top: 1px solid var(--fr-border); display: flex; flex-direction: column; gap: 3px; }
+.fr-list > li:first-child { border-top: 0; padding-top: 0; }
+.fr-list > li:last-child { padding-bottom: 0; }
+.fr-strong { font-weight: 600; }
+.fr-clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.fr-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--fr-accent); flex: none; }
+
+.fr-textarea {
+  width: 100%;
+  min-height: 150px;
+  resize: vertical;
+  font: inherit;
+  color: inherit;
+  padding: 10px 12px;
+  border-radius: var(--fr-radius);
+  border: 1px solid var(--fr-border);
+  background: var(--fr-bg-muted);
+}
+
+.fr-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 8px; }
+.fr-stat { padding: 10px 12px; border-radius: var(--fr-radius); background: var(--fr-bg-muted); }
+.fr-stat strong { display: block; font-family: var(--fr-mono); font-size: 18px; font-weight: 500; }
+.fr-stat span { font-size: 12px; color: var(--fr-fg-muted); }
+
+.fr-chart { width: 100%; height: 96px; display: block; }
+.fr-chart rect { fill: var(--fr-accent); }
+.fr-bar { height: 6px; border-radius: 3px; background: var(--fr-bg-muted); overflow: hidden; }
+.fr-bar i { display: block; height: 100%; border-radius: 3px; background: var(--fr-accent); }
+
+.fr-icon {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--fr-accent-bg);
+  color: var(--fr-accent-text);
+}
+.fr-icon svg { width: 18px; height: 18px; }
+
+.fr-skeleton { display: flex; flex-direction: column; gap: 10px; }
+.fr-skeleton i { height: 12px; border-radius: 6px; background: var(--fr-bg-muted); animation: fr-pulse 1.4s ease-in-out infinite; }
+.fr-skeleton i:nth-child(2) { width: 80%; }
+.fr-skeleton i:nth-child(3) { width: 55%; }
+@keyframes fr-pulse { 50% { opacity: 0.5; } }
+@media (prefers-reduced-motion: reduce) { .fr-skeleton i { animation: none; } }

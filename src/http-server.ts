@@ -1,7 +1,10 @@
 /**
  * Stateless HTTP entry point for the FirstReply MCP server.
  *
- * Every POST carries `Authorization: Bearer <fr_... api key>`. One handler serves
+ * Every POST carries `Authorization: Bearer <token>`: an organization API key (fr_...) or the
+ * access token of an OAuth sign-in. Without one the answer is a 401 that points MCP hosts at
+ * the discovery documents below, which is how Claude and ChatGPT start their sign-in; the
+ * FirstReply API is the authorization server (see auth.ts). One handler serves
  * both protocol eras: 2026-07-28 requests (per-request _meta envelope) are answered
  * by the SDK directly, 2025-era requests (initialize, claim-less calls) by a fresh
  * server over a stateless streamable HTTP transport. Every request gets its own
@@ -15,6 +18,14 @@ import type { Request, Response } from 'express';
 import { createMcpHandler } from '@modelcontextprotocol/server';
 import type { AuthInfo } from '@modelcontextprotocol/server';
 import { toNodeHandler } from '@modelcontextprotocol/node';
+import {
+  apiUrl,
+  authChallenge,
+  documentProxy,
+  extractBearerToken,
+  protectedResourceMetadata,
+  wwwAuthenticate,
+} from './auth.js';
 import { createServer, SERVER_NAME, SERVER_VERSION } from './server.js';
 
 const PORT = Number(process.env.PORT ?? 8080);
@@ -54,17 +65,32 @@ app.get('/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok', name: SERVER_NAME, version: SERVER_VERSION });
 });
 
+// Protected resource metadata (RFC 9728), also under the endpoint's path as hosts may ask for it
+app.get(['/.well-known/oauth-protected-resource', '/.well-known/oauth-protected-resource/*'], (_req: Request, res: Response) => {
+  res.set('Cache-Control', 'public, max-age=3600').json(protectedResourceMetadata());
+});
+
+const authorizationServerMetadata = documentProxy(`${apiUrl()}/.well-known/oauth-authorization-server`);
+app.get('/.well-known/oauth-authorization-server', async (_req: Request, res: Response) => {
+  const { status, body } = await authorizationServerMetadata();
+  if (status === 200) res.set('Cache-Control', 'public, max-age=3600');
+  res.status(status).json(body);
+});
+
 app.post(ENDPOINT_PATH, async (req: Request, res: Response) => {
   const token = extractBearerToken(req.headers.authorization);
-  if (!token) {
+  const challenge = authChallenge(token);
+  if (!token || challenge) {
     res
       .status(401)
-      .set('WWW-Authenticate', 'Bearer realm="FirstReply MCP", error="invalid_token"')
+      .set('WWW-Authenticate', wwwAuthenticate(challenge?.error, challenge?.description))
       .json({
         jsonrpc: '2.0',
         error: {
           code: -32001,
-          message: 'Authentication required: send "Authorization: Bearer <FirstReply organization API key (fr_...)>".',
+          message:
+            challenge?.description ??
+            'Authentication required: sign in, or send "Authorization: Bearer <FirstReply organization API key (fr_...)>".',
         },
         id: null,
       });
@@ -90,12 +116,6 @@ app.get(ENDPOINT_PATH, (req: Request, res: Response, next) => {
 });
 
 app.use(express.static(PUBLIC_DIR, { maxAge: '1h' }));
-
-function extractBearerToken(header: string | undefined): string | null {
-  if (!header) return null;
-  const match = /^Bearer\s+(.+)$/i.exec(header.trim());
-  return match ? match[1] : null;
-}
 
 app.listen(PORT, () => {
   console.error(`FirstReply MCP server listening on :${PORT} (endpoint ${ENDPOINT_PATH}, protocol 2025-* and 2026-07-28)`);

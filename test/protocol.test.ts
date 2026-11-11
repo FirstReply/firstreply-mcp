@@ -49,6 +49,14 @@ before(async () => {
       res.end(JSON.stringify({ items: [{ id: 'org1', name: 'Acme' }], params: {} }));
       return;
     }
+    if (req.method === 'POST' && req.url === '/v1/organizations/org1/conversations/search') {
+      res.end(JSON.stringify({ items: [{ id: 'c1', subject: 'Refund', status: 0, contact: { name: 'Dana' } }] }));
+      return;
+    }
+    if (req.method === 'GET' && req.url === '/.well-known/oauth-authorization-server') {
+      res.end(JSON.stringify({ issuer: apiUrl, registration_endpoint: `${apiUrl}/v1/oauth/register` }));
+      return;
+    }
     res.statusCode = 404;
     res.end(JSON.stringify({ error: 'EntityNotFoundException', message: 'Not found' }));
   });
@@ -79,6 +87,30 @@ async function exercise(client: Client): Promise<void> {
   const content = result.content as Array<{ type: string; text: string }>;
   assert.equal(JSON.parse(content[0].text).items[0].id, 'org1');
   assert.deepEqual(apiCalls, [`GET /v1/organizations Bearer ${API_KEY}`]);
+
+  // A tool with a widget: linked in its descriptor, and the result carries the widget's view
+  // next to the text the model reads
+  const ui = (list._meta as { ui?: { resourceUri?: string } } | undefined)?.ui;
+  assert.equal(ui?.resourceUri, 'ui://firstreply/ConversationList.html');
+  const listed = await client.callTool({ name: 'conversation_list', arguments: { organizationId: 'org1' } });
+  assert.equal(JSON.parse((listed.content as Array<{ text: string }>)[0].text).items[0].id, 'c1');
+  assert.deepEqual((listed.structuredContent as { conversations: unknown[] }).conversations[0], {
+    id: 'c1',
+    subject: 'Refund',
+    status: 0,
+    contact: 'Dana',
+  });
+
+  const { resources } = await client.listResources();
+  assert.deepEqual(
+    resources.map((resource) => resource.uri).sort(),
+    ['ConversationList', 'PostAnalytics', 'PostCard', 'ReplyDraft', 'ResultCard'].map((name) => `ui://firstreply/${name}.html`),
+  );
+  assert.ok(resources.every((resource) => resource.mimeType === 'text/html;profile=mcp-app'));
+  const widget = await client.readResource({ uri: 'ui://firstreply/ResultCard.html' });
+  const html = widget.contents[0] as { mimeType?: string; text: string };
+  assert.equal(html.mimeType, 'text/html;profile=mcp-app');
+  assert.match(html.text, /^<!DOCTYPE html>[\s\S]*<div id="root"><\/div>/);
 
   // An API error stays a tool error instead of failing the request
   const failed = await client.callTool({ name: 'conversation_get', arguments: { organizationId: 'org1', conversationId: 'c1' } });
@@ -115,7 +147,12 @@ describe('http', () => {
   before(async () => {
     const port = await freePort();
     baseUrl = `http://127.0.0.1:${port}`;
-    const env: NodeJS.ProcessEnv = { ...process.env, PORT: String(port), FIRSTREPLY_API_URL: apiUrl };
+    const env: NodeJS.ProcessEnv = {
+      ...process.env,
+      PORT: String(port),
+      FIRSTREPLY_API_URL: apiUrl,
+      MCP_SERVER_URL: 'https://mcp.example.test/',
+    };
     delete env.FIRSTREPLY_API_TOKEN; // the token must come from the request
     child = spawn(process.execPath, [path.join(dist, 'http-server.js')], { env, stdio: 'ignore' });
     for (let i = 0; i < 50; i++) {
@@ -181,10 +218,49 @@ describe('http', () => {
       body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }),
     });
     assert.equal(response.status, 401);
-    assert.match(response.headers.get('www-authenticate') ?? '', /^Bearer /);
+    // MCP hosts start their sign-in from this pointer
+    assert.match(
+      response.headers.get('www-authenticate') ?? '',
+      /^Bearer resource_metadata="https:\/\/mcp\.example\.test\/\.well-known\/oauth-protected-resource"$/,
+    );
 
     const client = new Client({ name: 'e2e', version: '1' }, { versionNegotiation: { mode: { pin: MODERN_VERSION } } });
     await assert.rejects(client.connect(new StreamableHTTPClientTransport(new URL(`${baseUrl}/`))));
+  });
+
+  test('an expired access token is refused with invalid_token, so the host refreshes it', async () => {
+    const jwt = (exp: number) =>
+      `${Buffer.from('{"alg":"HS256"}').toString('base64url')}.${Buffer.from(JSON.stringify({ sub: 'u1', exp })).toString('base64url')}.sig`;
+    const post = (token: string) =>
+      fetch(`${baseUrl}/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json, text/event-stream',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'initialize',
+          params: { protocolVersion: LEGACY_VERSION, capabilities: {}, clientInfo: { name: 'e2e', version: '1' } },
+        }),
+      });
+    const expired = await post(jwt(Math.floor(Date.now() / 1000) - 60));
+    assert.equal(expired.status, 401);
+    assert.match(expired.headers.get('www-authenticate') ?? '', /error="invalid_token"/);
+    assert.equal((await post(jwt(Math.floor(Date.now() / 1000) + 600))).status, 200);
+  });
+
+  test('the discovery documents name this server and the API as authorization server', async () => {
+    for (const path of ['/.well-known/oauth-protected-resource', '/.well-known/oauth-protected-resource/mcp']) {
+      const resource = (await (await fetch(`${baseUrl}${path}`)).json()) as Record<string, unknown>;
+      assert.equal(resource.resource, 'https://mcp.example.test');
+      assert.deepEqual(resource.authorization_servers, [apiUrl]);
+    }
+    // The API's own document, served from this origin for older clients
+    const server = (await (await fetch(`${baseUrl}/.well-known/oauth-authorization-server`)).json()) as Record<string, unknown>;
+    assert.equal(server.registration_endpoint, `${apiUrl}/v1/oauth/register`);
   });
 
   test('CORS preflight allows the 2026-07-28 headers', async () => {

@@ -181,14 +181,41 @@ import / export, publishing posts right away, approving posts, media
 uploads, comment moderation and private replies to comments. Those stay in the
 FirstReply web app.
 
+## Widgets
+
+Hosts that support MCP Apps (Claude, ChatGPT) show some results as a small view
+next to the answer:
+
+| Widget | Tools | What it shows |
+|---|---|---|
+| `ConversationList` | `conversation_list` | Contact, subject, last message, status and classification per conversation |
+| `ReplyDraft` | `ai_draft_reply` | The draft in a text field, with Send reply, Save as draft and Copy |
+| `PostCard` | `post_get`, `post_create`, `post_schedule`, `post_reschedule` | The post, its time and the status per channel |
+| `PostAnalytics` | `post_analytics` | Totals, views per day and numbers per channel |
+| `ResultCard` | `conversation_reply`, `conversation_close`, `channel_connect`, `channel_create`, `channel_update` | A confirmation, or the sign-in link of a channel |
+
+Send reply in `ReplyDraft` calls `conversation_reply` with the text on screen;
+a host that does not let widgets call tools only offers Copy. Widgets are in
+English and German, following the host's language. Other hosts ignore them and
+get the same JSON text as before.
+
 ## Requirements
 
 - Node.js >= 20
-- A FirstReply organization API key
+- A FirstReply account, or an organization API key
 
 ## Authentication
 
-The server authenticates against the FirstReply REST API with an
+The hosted server accepts two kinds of bearer token:
+
+- **Sign-in (OAuth 2.1):** hosts such as Claude and ChatGPT only need the
+  address `https://mcp.firstreply.ai/`. They register themselves, send the
+  user to FirstReply to allow the connection, and act with that user's
+  permissions in all of their organizations.
+- **Organization API key:** as described below; the only option for the local
+  (stdio) server.
+
+With an API key, the server authenticates against the FirstReply REST API with an
 **organization API key** (`fr_...`), created in FirstReply under
 Organization → Development → API Keys. Organizations support multiple named
 keys with optional expiry, so it is best to create a dedicated key for this
@@ -242,8 +269,12 @@ npm run build && npm run start:http   # listens on :8080
 
 Stateless: every request gets its own server instance, 2026-07-28 requests
 are answered directly and 2025-era clients over a stateless streamable-HTTP
-transport. Every request must carry `Authorization: Bearer fr_...`. A
+transport. Every request must carry `Authorization: Bearer` with an API key or access token. A
 `/health` endpoint is provided for probes.
+
+Without a token the answer is 401 with a `WWW-Authenticate` header naming
+`/.well-known/oauth-protected-resource`, where the sign-in of an MCP host
+starts; `MCP_SERVER_URL` is the address the server names itself with there.
 
 A browser that opens the endpoint (`GET /` with `Accept: text/html`) gets the
 landing page from `public/`.
@@ -254,6 +285,7 @@ landing page from `public/`.
 |----------|-------------|
 | `FIRSTREPLY_API_TOKEN` | Organization API key (stdio mode) |
 | `FIRSTREPLY_API_URL` | API base URL (default `https://api.firstreply.ai`) |
+| `MCP_SERVER_URL` | Public address of the HTTP server, its OAuth resource identifier (default `https://mcp.firstreply.ai`) |
 | `PORT` | HTTP port (HTTP mode, default 8080) |
 | `MCP_ENDPOINT_PATH` | HTTP endpoint path (default `/`) |
 

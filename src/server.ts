@@ -10,6 +10,16 @@ import { McpServer, ProtocolError, ProtocolErrorCode } from '@modelcontextprotoc
 import { z } from 'zod';
 import { FirstReplyApiError, FirstReplyClient } from './client.js';
 import { dispatchTool, TOOL_DEFINITIONS } from './tools.js';
+import {
+  readWidget,
+  toolWidgetMeta,
+  WIDGET_MIME_TYPE,
+  WIDGET_NAMES,
+  widgetData,
+  widgetDescription,
+  widgetResourceMeta,
+  widgetUri,
+} from './widgets.js';
 
 const { version } = createRequire(import.meta.url)('../../package.json') as { version: string };
 
@@ -17,7 +27,7 @@ export const SERVER_NAME = 'firstreply-mcp';
 export const SERVER_VERSION: string = version;
 
 export interface FirstReplyServerOptions {
-  /** Bearer token: an organization API key ("fr_...") or user JWT. */
+  /** Bearer token: an organization API key ("fr_...") or the access token of an OAuth sign-in (a user JWT). */
   token?: string;
 }
 
@@ -47,6 +57,7 @@ export function createServer(options: FirstReplyServerOptions = {}): McpServer {
         description: tool.description,
         inputSchema: z.object(tool.inputSchema),
         annotations: tool.annotations,
+        _meta: toolWidgetMeta(tool.name),
       },
       async (args) => {
         try {
@@ -54,8 +65,11 @@ export function createServer(options: FirstReplyServerOptions = {}): McpServer {
           if (result === null) {
             throw new ProtocolError(ProtocolErrorCode.MethodNotFound, `Unknown tool: ${tool.name}`);
           }
+          // The text is what the model reads on every host; the widget gets its own view of it
+          const structuredContent = widgetData(tool.name, args as Record<string, unknown>, result);
           return {
             content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+            ...(structuredContent ? { structuredContent } : {}),
           };
         } catch (error) {
           if (error instanceof ProtocolError) throw error;
@@ -68,13 +82,24 @@ export function createServer(options: FirstReplyServerOptions = {}): McpServer {
     );
   }
 
+  for (const name of WIDGET_NAMES) {
+    const uri = widgetUri(name);
+    const _meta = widgetResourceMeta(name);
+    server.registerResource(
+      `${name} widget`,
+      uri,
+      { description: widgetDescription(name), mimeType: WIDGET_MIME_TYPE, _meta },
+      async () => ({ contents: [{ uri, mimeType: WIDGET_MIME_TYPE, text: await readWidget(name), _meta }] }),
+    );
+  }
+
   return server;
 }
 
 function formatError(error: unknown): string {
   if (error instanceof FirstReplyApiError) {
     if (error.status === 401) {
-      return 'Authentication failed (401). Check that FIRSTREPLY_API_TOKEN is a valid organization API key (fr_...); regenerate it in FirstReply under Organization Settings if needed.';
+      return 'Authentication failed (401). Sign in again, or check that the organization API key (fr_...) is valid; regenerate it in FirstReply under Organization Settings if needed.';
     }
     if (error.status === 402) {
       return 'This feature is not available on the organization\'s current plan (402). Upgrade the plan in FirstReply to use it.';

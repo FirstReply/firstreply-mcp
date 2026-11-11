@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Sign-in with a FirstReply account (OAuth 2.1) on the hosted server, next to
+  API keys: a request without a token gets a 401 that points to
+  `/.well-known/oauth-protected-resource`, and an expired access token gets
+  `invalid_token` so the host refreshes it. This is what Claude's and
+  ChatGPT's connectors need.
+- Widgets (MCP Apps) for hosts that render them: `ConversationList`,
+  `ReplyDraft` (edit, send or store the draft), `PostCard`, `PostAnalytics`
+  and `ResultCard`. The tools linked to them return `structuredContent` next
+  to the unchanged JSON text.
 - The HTTP server answers a browser's `GET /` with a landing page
   (`public/index.html`): what the server does, example prompts and the setup
   per client. MCP clients still get the 405 for `GET`.

@@ -5,9 +5,10 @@ FROM node:22-slim AS builder
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --no-audit --no-fund
-COPY tsconfig.json ./
+COPY tsconfig.json build-web.mjs ./
 COPY src/ ./src/
 COPY test/ ./test/
+COPY web/ ./web/
 RUN npm run build
 
 FROM node:22-slim
@@ -16,6 +17,7 @@ ENV NODE_ENV=production
 COPY package*.json ./
 RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
 COPY --from=builder /app/dist/src ./dist/src
+COPY --from=builder /app/web/dist ./web/dist
 COPY public/ ./public/
 USER node
 EXPOSE 8080
