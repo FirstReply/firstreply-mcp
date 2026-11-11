@@ -17,7 +17,8 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      # write: the last step creates the GitHub Release
+      contents: write
       # Required for npm trusted publishing (provenance).
       id-token: write
     steps:
@@ -47,3 +48,12 @@ jobs:
 
       - name: Publish to npm
         run: npm publish --access public
+
+      # The monorepo pushes a bare tag, so the release page is created here.
+      # Not for a manual run, which has no tag.
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: gh release create "$GITHUB_REF_NAME" --verify-tag --title "$GITHUB_REF_NAME" --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
