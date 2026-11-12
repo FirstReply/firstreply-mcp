@@ -137,7 +137,7 @@ add(
 
 add(
   'channel_connect',
-  `Start connecting an account that is connected by signing in on the platform: ${OAUTH_PLATFORMS.join(', ')} (MESSENGER is a Facebook Page). Returns a link (authUrl): the user opens it in a browser where they are signed in to FirstReply as the organization's owner, signs in on the platform, and FirstReply creates the channel; when the login can connect several accounts (Pages, locations, ...) FirstReply asks which one. The link is valid for 10 minutes. With channelId it reconnects that channel instead: after an expired or revoked login, or to grant more capabilities. Facebook Pages grant one capability per login, so ask for one at a time (first connect, then once more with channelId for PUBLISHING). Afterwards check channel_get: publishingAuthorized tells whether posts are allowed, channel_update turns publishingEnabled on.`,
+  `Start connecting an account that is connected by signing in on the platform: ${OAUTH_PLATFORMS.join(', ')} (MESSENGER is a Facebook Page). Returns a link (authUrl): the user opens it in a browser where they are signed in to FirstReply as the organization's owner, signs in on the platform, and FirstReply creates the channel; when the login can connect several accounts (Pages, locations, ...) FirstReply asks which one. The link is valid for 10 minutes. With channelId it reconnects that channel instead: after an expired or revoked login, or to grant what the first login left out. A login asks for everything (messages, publishing, comments, insights) unless capabilities names some. Afterwards check channel_get: grantedCapabilities lists what the login allowed, publishingAuthorized tells whether posts are allowed, channel_update turns publishingEnabled on.`,
   {
     organizationId: ORG_ID,
     platform: z.enum(OAUTH_PLATFORMS).describe('The platform of a new channel. Not needed with channelId.').optional(),
@@ -146,7 +146,7 @@ add(
     capabilities: z
       .array(z.enum(['MESSAGING', 'PUBLISHING', 'COMMENTS', 'INSIGHTS']))
       .describe(
-        'What the login asks for on Facebook, Instagram and TikTok (TikTok: COMMENTS on a reconnect adds the comments login). Default MESSAGING. Other platforms have one login for everything.',
+        'What the login asks for on Facebook, Instagram and TikTok (TikTok: COMMENTS on a reconnect adds the comments login). Default: everything. Other platforms have one login for everything.',
       )
       .optional(),
     server: optStr('MASTODON: the server the account is on, e.g. mastodon.social.'),
