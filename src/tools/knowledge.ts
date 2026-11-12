@@ -2,12 +2,14 @@
  * Knowledge base entries and the synced knowledge sources.
  */
 
+import { z } from 'zod';
 import {
   add,
   DESTRUCTIVE,
   idList,
   LIMIT,
   optBool,
+  optNum,
   optStr,
   ORG_ID,
   orgPath,
@@ -38,6 +40,19 @@ function withoutConfiguration(value: unknown): unknown {
     return out;
   }
   return value;
+}
+
+const CONFIGURATION_BY_TYPE =
+  'Settings (configuration) by source type. WEBSITE: baseUrl (required, the public address of the site), paths (comma separated, e.g. /docs,/help), maxDepth (1 to 10), includePatterns and excludePatterns (comma separated). HELPDESK (Freshdesk): apiUrl (required, e.g. https://yourcompany.freshdesk.com), apiKey (required), categories and tags (comma separated names).';
+
+/** The stored settings of a source as an object, empty when there are none or they cannot be read. */
+function storedConfiguration(value: string | undefined): Record<string, unknown> {
+  try {
+    const parsed: unknown = value ? JSON.parse(value) : {};
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
 }
 
 add(
@@ -134,6 +149,65 @@ add(
   { organizationId: ORG_ID, sourceId: SOURCE_ID },
   READ,
   async (client, args) => withoutConfiguration(await client.get(sourcePath(args.organizationId, args.sourceId))),
+);
+
+add(
+  'knowledge_source_create',
+  `Add a knowledge source that is set up without a sign-in; its first sync starts right away. ${CONFIGURATION_BY_TYPE} GitHub, Notion, GitBook, ClickUp and monday.com sources are connected by signing in and are added in FirstReply.`,
+  {
+    organizationId: ORG_ID,
+    sourceType: z.enum(['WEBSITE', 'HELPDESK']).describe('The kind of source.'),
+    name: str('Name of the source.'),
+    configuration: z.record(z.string(), z.unknown()).describe('The settings of the source type, see the tool description.'),
+    syncEnabled: optBool('false adds the source without syncing it (default true).'),
+    syncIntervalMinutes: optNum('Minutes between two syncs (default 60).'),
+  },
+  WRITE,
+  async (client, { organizationId, configuration, ...fields }) =>
+    withoutConfiguration(
+      await client.post(orgPath(organizationId, '/knowledge-sources'), {
+        ...fields,
+        configuration: JSON.stringify(configuration),
+      }),
+    ),
+);
+
+add(
+  'knowledge_source_update',
+  `Update a knowledge source. Only provide what changes; the other settings and the credentials of the source are kept. ${CONFIGURATION_BY_TYPE}`,
+  {
+    organizationId: ORG_ID,
+    sourceId: SOURCE_ID,
+    name: optStr('New name.'),
+    configuration: z
+      .record(z.string(), z.unknown())
+      .describe('The settings to change, by key; all others stay as they are.')
+      .optional(),
+    syncEnabled: optBool('Turn the automatic sync on or off.'),
+    syncIntervalMinutes: optNum('Minutes between two syncs.'),
+  },
+  WRITE,
+  async (client, { organizationId, sourceId, configuration, ...fields }) => {
+    const path = sourcePath(organizationId, sourceId);
+    let merged: string | undefined;
+    if (configuration && Object.keys(configuration).length) {
+      // The API replaces the settings as a whole, so the changes go on top of the stored ones, as the web app's form sends them.
+      const current = (await client.get(path)) as { configuration?: string };
+      merged = JSON.stringify({ ...storedConfiguration(current.configuration), ...configuration });
+    }
+    return withoutConfiguration(await client.put(path, { ...fields, configuration: merged }));
+  },
+);
+
+add(
+  'knowledge_source_delete',
+  'Delete a knowledge source permanently. It is no longer synced.',
+  { organizationId: ORG_ID, sourceId: SOURCE_ID },
+  DESTRUCTIVE,
+  async (client, args) => {
+    await client.delete(sourcePath(args.organizationId, args.sourceId));
+    return { success: true, message: 'Knowledge source deleted.' };
+  },
 );
 
 add(

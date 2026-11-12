@@ -6,7 +6,18 @@
  * backend's AuthenticationFilter.
  */
 
+import { randomUUID } from 'node:crypto';
+import { Readable } from 'node:stream';
+
 const DEFAULT_BASE_URL = 'https://api.firstreply.ai';
+
+/** A file to upload: its bytes as a stream, with the size and type known up front. */
+export interface UploadFile {
+  stream: AsyncIterable<Uint8Array>;
+  size: number;
+  contentType: string;
+  fileName: string;
+}
 
 export class FirstReplyApiError extends Error {
   constructor(
@@ -44,6 +55,29 @@ export class FirstReplyClient {
     return this.send('DELETE', path);
   }
 
+  /**
+   * POSTs a file as multipart form data (parts `file` and `fileSize`), streamed: the
+   * file is never held in memory.
+   */
+  postFile(path: string, file: UploadFile): Promise<unknown> {
+    const boundary = `----firstreply-${randomUUID()}`;
+    const fileName = file.fileName.replace(/[\r\n"\\]/g, '_');
+    const head =
+      `--${boundary}\r\nContent-Disposition: form-data; name="fileSize"\r\n\r\n${file.size}\r\n` +
+      `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${fileName}"\r\n` +
+      `Content-Type: ${file.contentType}\r\n\r\n`;
+    const parts = async function* (): AsyncGenerator<Uint8Array> {
+      yield Buffer.from(head);
+      yield* file.stream;
+      yield Buffer.from(`\r\n--${boundary}--\r\n`);
+    };
+    return this.request('POST', path, {
+      headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}` },
+      body: Readable.toWeb(Readable.from(parts())) as unknown as RequestInit['body'],
+      duplex: 'half',
+    });
+  }
+
   private withQuery(path: string, query?: Record<string, string | number | undefined>): string {
     if (!query) return path;
     const params = new URLSearchParams();
@@ -56,15 +90,22 @@ export class FirstReplyClient {
     return encoded ? `${path}?${encoded}` : path;
   }
 
-  private async send(method: string, path: string, body?: unknown): Promise<unknown> {
+  private send(method: string, path: string, body?: unknown): Promise<unknown> {
+    return this.request(method, path, {
+      headers: { 'Content-Type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  }
+
+  private async request(method: string, path: string, init: RequestInit & { duplex?: 'half' }): Promise<unknown> {
     const response = await fetch(this.baseUrl + path, {
+      ...init,
       method,
       headers: {
         Authorization: `Bearer ${this.token}`,
-        'Content-Type': 'application/json',
         Accept: 'application/json',
+        ...(init.headers as Record<string, string>),
       },
-      body: body === undefined ? undefined : JSON.stringify(body),
     });
 
     const text = await response.text();

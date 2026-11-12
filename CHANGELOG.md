@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `knowledge_source_create` (website and helpdesk sources),
+  `knowledge_source_update` and `knowledge_source_delete`.
+- `post_statistics`: how many posts are in each state and when the next
+  scheduled one goes out.
+- `attachment_upload` uploads a file from a public https address, and
+  `conversation_reply` takes the result in `attachments`.
 - Sign-in with a FirstReply account (OAuth 2.1) on the hosted server, next to
   API keys: a request without a token gets a 401 that points to
   `/.well-known/oauth-protected-resource`, and an expired access token gets

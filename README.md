@@ -65,7 +65,7 @@ minutes. There is no tool to delete a channel.
 | `conversation_get` | Get one conversation |
 | `conversation_thread` | Get a conversation with all of its messages |
 | `conversation_messages` | List the messages of a conversation |
-| `conversation_reply` | Send a reply to the customer, or store an internal note or a draft (destructive) |
+| `conversation_reply` | Send a reply to the customer, or store an internal note or a draft, with attachments (destructive) |
 | `conversation_close` | Close a conversation |
 | `conversation_read` | Mark a conversation as read |
 | `conversation_spam` | Mark a conversation as spam or not spam |
@@ -79,12 +79,17 @@ minutes. There is no tool to delete a channel.
 | `message_update` | Edit a draft or internal note |
 | `message_send` | Send a draft (destructive) |
 | `message_delete` | Delete a message (destructive) |
+| `attachment_upload` | Upload a file from a public https address; returns the attachment for `conversation_reply` |
 
 The `search` argument of `conversation_list`, `search` and the saved filters
 understands the FirstReply search syntax: words are AND-ed and prefix matched,
 `"quoted phrases"`, `-word`, and the operators `from:`, `subject:`, `is:`
 (`open`, `closed`, `unread`, `read`, `assigned`, `unassigned`, `ai`), `has:`
 (`attachment`, `draft`), `before:` and `after:` (`YYYY-MM-DD`).
+
+`attachment_upload` takes images (JPEG, PNG, GIF, WebP), PDF, plain text, CSV,
+Word and Excel files of up to 50 MB. Like `post_media_upload` it only fetches
+public https addresses, and the file is streamed to the API, not kept.
 
 ### Contacts
 
@@ -103,6 +108,7 @@ understands the FirstReply search syntax: words are AND-ed and prefix matched,
 |------|-------------|
 | `post_list` | List / filter posts (status, channel, period, text); `order: asc` for upcoming posts |
 | `post_get` | Get a post with its channels, publish state and latest metrics |
+| `post_statistics` | How many posts are drafts, waiting for approval, scheduled, published and failed, and when the next one goes out |
 | `post_metrics` | Metric snapshots of every channel of a published post |
 | `post_comments` | The comment threads on a post, as conversations |
 | `post_write` | Write, shorten or rewrite a post text with AI, for a platform and a character limit; saves nothing |
@@ -149,10 +155,16 @@ FirstReply.
 | `knowledge_delete` | Delete a knowledge entry (destructive) |
 | `knowledge_source_list` | List synced knowledge sources with their sync state |
 | `knowledge_source_get` | Get one knowledge source |
+| `knowledge_source_create` | Add a website or helpdesk (Freshdesk) source |
+| `knowledge_source_update` | Rename a source, change its settings or its sync |
+| `knowledge_source_delete` | Delete a knowledge source (destructive) |
 | `knowledge_source_sync` | Start a sync now |
 | `knowledge_source_status` | Sync status of a source |
 
 Knowledge source configurations hold credentials and are never returned.
+`knowledge_source_update` puts the settings it is given on top of the stored
+ones. GitHub, Notion, GitBook, ClickUp and monday.com sources are connected
+by signing in and are added in FirstReply; their settings can be changed here.
 
 ### AI & search
 

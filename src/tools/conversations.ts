@@ -2,6 +2,7 @@
  * Conversations: listing, reading, replying, triage and statistics.
  */
 
+import { z } from 'zod';
 import {
   add,
   CONVERSATION_ID,
@@ -9,6 +10,7 @@ import {
   epochMillis,
   idList,
   LIMIT,
+  num,
   optBool,
   optDate,
   optEnum,
@@ -129,6 +131,17 @@ add(
       'Two-letter code of the language of message when it was translated for the customer (see ai_translate). Send together with translation.',
     ),
     translation: optStr('The text as the agent wrote it, when message is a translation of it. Kept alongside the sent text.'),
+    attachments: z
+      .array(
+        z.object({
+          name: str('File name.'),
+          size: num('Size in bytes.'),
+          mime: str('MIME type.'),
+          file: z.string().regex(/^[^/\\]+$/).describe('The stored file, as attachment_upload returned it.'),
+        }),
+      )
+      .describe('Files to send along, each as returned by attachment_upload.')
+      .optional(),
   },
   DESTRUCTIVE,
   async (client, args) => {
@@ -147,6 +160,7 @@ add(
       draft: args.draft,
       language: args.language,
       translation: args.translation,
+      ...(args.attachments ? { attachments: args.attachments } : {}),
     });
   },
 );

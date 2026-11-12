@@ -2,9 +2,12 @@
  * Single messages: reading, editing drafts, sending drafts, deleting.
  */
 
+import { openRemoteFile } from '../media.js';
 import { add, DESTRUCTIVE, optStr, ORG_ID, orgPath, READ, str, WRITE } from './registry.js';
 
 const MESSAGE_ID = str('The message id (see conversation_messages or conversation_thread).');
+/** The API's limit for one attachment. */
+const MAX_ATTACHMENT_BYTES = 50 * 1024 * 1024;
 
 const messagePath = (organizationId: string, messageId: string, suffix = ''): string =>
   orgPath(organizationId, `/messages/${messageId}${suffix}`);
@@ -60,6 +63,38 @@ add(
   { organizationId: ORG_ID, messageId: MESSAGE_ID },
   DESTRUCTIVE,
   (client, args) => client.post(messagePath(args.organizationId, args.messageId, '/send')),
+);
+
+add(
+  'attachment_upload',
+  'Upload a file from a public https address as an attachment for a reply (JPEG, PNG, GIF or WebP image, PDF, plain text, CSV, Word or Excel document, up to 50 MB; the address has to report the file size). Returns the attachment (name, size, mime, file): pass it unchanged in attachments to conversation_reply.',
+  {
+    organizationId: ORG_ID,
+    url: str('Public https:// address of the file. Private or local addresses are refused.'),
+    fileName: optStr('File name the customer sees. Default: the last part of the address.'),
+    contentType: optStr('MIME type, e.g. application/pdf. Default: what the address reports.'),
+  },
+  { ...WRITE, openWorldHint: true },
+  async (client, args) => {
+    const file = await openRemoteFile(args.url);
+    try {
+      if (file.size > MAX_ATTACHMENT_BYTES) {
+        throw new Error('The file is larger than 50 MB.');
+      }
+      const contentType = args.contentType ?? file.contentType;
+      if (!contentType) {
+        throw new Error('The address does not report the type of the file: pass contentType.');
+      }
+      return await client.postFile(orgPath(args.organizationId, '/attachment'), {
+        stream: file.stream,
+        size: file.size,
+        contentType,
+        fileName: args.fileName ?? file.fileName,
+      });
+    } finally {
+      file.stream.destroy();
+    }
+  },
 );
 
 add(

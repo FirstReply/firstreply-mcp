@@ -455,6 +455,7 @@ test('no tool publishes, approves, retries or deletes a post', () => {
     'post_metrics',
     'post_reschedule',
     'post_schedule',
+    'post_statistics',
     'post_write',
   ]);
 });
@@ -590,5 +591,146 @@ test('post_media_upload only fetches public https addresses', async () => {
   }
   for (const address of ['8.8.8.8', '172.32.0.1', '2a00:1450:4001::200e', '::ffff:8.8.8.8']) {
     assert.equal(isPublicAddress(address), true, address);
+  }
+});
+
+test('knowledge_source_create sends the settings as JSON and returns no configuration', async () => {
+  const { client, calls } = fakeClient({
+    'POST /v1/organizations/org/knowledge-sources': { id: 's1', name: 'Docs', configuration: '{"baseUrl":"https://example.com"}' },
+  });
+  const result = await dispatchTool(client, 'knowledge_source_create', {
+    organizationId: 'org',
+    sourceType: 'WEBSITE',
+    name: 'Docs',
+    configuration: { baseUrl: 'https://example.com', paths: '/docs' },
+  });
+  assert.deepEqual(calls, [{
+    method: 'POST',
+    path: '/v1/organizations/org/knowledge-sources',
+    body: { sourceType: 'WEBSITE', name: 'Docs', configuration: '{"baseUrl":"https://example.com","paths":"/docs"}' },
+  }]);
+  assert.deepEqual(result, { id: 's1', name: 'Docs' });
+
+  // Sources that need a sign-in are not created here
+  await assert.rejects(
+    dispatchTool(client, 'knowledge_source_create', { organizationId: 'org', sourceType: 'NOTION', name: 'Wiki', configuration: {} }),
+    /sourceType/,
+  );
+});
+
+test('knowledge_source_update puts changed settings on top of the stored ones', async () => {
+  const { client, calls } = fakeClient({
+    'GET /v1/organizations/org/knowledge-sources/s1': {
+      id: 's1',
+      configuration: '{"apiUrl":"https://example.freshdesk.com","apiKey":"enc:stored","tags":"faq"}',
+    },
+    'PUT /v1/organizations/org/knowledge-sources/s1': { id: 's1', name: 'Help', configuration: '{"apiKey":"enc:stored"}' },
+  });
+  const result = await dispatchTool(client, 'knowledge_source_update', {
+    organizationId: 'org',
+    sourceId: 's1',
+    configuration: { tags: 'guide' },
+    syncEnabled: false,
+  });
+  assert.deepEqual(calls[1], {
+    method: 'PUT',
+    path: '/v1/organizations/org/knowledge-sources/s1',
+    body: {
+      syncEnabled: false,
+      configuration: '{"apiUrl":"https://example.freshdesk.com","apiKey":"enc:stored","tags":"guide"}',
+    },
+  });
+  assert.deepEqual(result, { id: 's1', name: 'Help' });
+
+  // Without settings nothing is read and the configuration stays untouched
+  calls.length = 0;
+  await dispatchTool(client, 'knowledge_source_update', { organizationId: 'org', sourceId: 's1', name: 'Help' });
+  assert.deepEqual(calls, [{
+    method: 'PUT',
+    path: '/v1/organizations/org/knowledge-sources/s1',
+    body: { name: 'Help', configuration: undefined },
+  }]);
+});
+
+test('knowledge_source_delete deletes the source', async () => {
+  const { client, calls } = fakeClient();
+  await dispatchTool(client, 'knowledge_source_delete', { organizationId: 'org', sourceId: 's1' });
+  assert.deepEqual(calls, [{ method: 'DELETE', path: '/v1/organizations/org/knowledge-sources/s1', body: undefined }]);
+});
+
+test('post_statistics reads the counts, optionally of one channel', async () => {
+  const { client, calls } = fakeClient();
+  await dispatchTool(client, 'post_statistics', { organizationId: 'org', channelId: 'ch1' });
+  assert.deepEqual(calls, [{ method: 'GET', path: '/v1/organizations/org/posts/statistics', body: { channelId: 'ch1' } }]);
+});
+
+test('attachment_upload only fetches public https addresses', async () => {
+  const { client, calls } = fakeClient();
+  for (const url of ['http://example.com/a.pdf', 'https://127.0.0.1/a.pdf', 'https://[::1]/a.pdf', 'https://169.254.169.254/latest', 'https://localhost/a.pdf', 'file:///etc/passwd']) {
+    await assert.rejects(dispatchTool(client, 'attachment_upload', { organizationId: 'org', url }), /public|https/, url);
+  }
+  assert.equal(calls.length, 0);
+});
+
+test('conversation_reply sends attachments as attachment_upload returned them', async () => {
+  const { client, calls } = fakeClient({
+    'GET /v1/organizations/org/conversations/c1': { lastMessageId: 'm9' },
+  });
+  const attachment = { name: 'invoice.pdf', size: 1200, mime: 'application/pdf', file: '20261112100000_ab12_invoice.pdf' };
+  await dispatchTool(client, 'conversation_reply', {
+    organizationId: 'org',
+    conversationId: 'c1',
+    message: 'Attached.',
+    attachments: [attachment],
+  });
+  assert.deepEqual((calls[1].body as { attachments: unknown }).attachments, [attachment]);
+
+  // A stored file is a plain name inside the organization, never a path
+  await assert.rejects(
+    dispatchTool(client, 'conversation_reply', {
+      organizationId: 'org',
+      conversationId: 'c1',
+      message: 'Attached.',
+      attachments: [{ ...attachment, file: '../other/file.pdf' }],
+    }),
+    /attachments/,
+  );
+  assert.equal(calls.length, 2);
+});
+
+test('postFile streams the file as multipart form data', async () => {
+  const realFetch = globalThis.fetch;
+  let request: { url: string; contentType: string; body: string } | undefined;
+  globalThis.fetch = (async (url: string, init: RequestInit) => {
+    request = {
+      url,
+      contentType: (init.headers as Record<string, string>)['Content-Type'],
+      body: await new Response(init.body).text(),
+    };
+    return new Response('{"name":"a.pdf","file":"stored_a.pdf"}', { status: 200 });
+  }) as typeof fetch;
+  try {
+    const client = new FirstReplyClient('token', 'https://api.example.com');
+    const result = await client.postFile('/v1/organizations/org/attachment', {
+      stream: (async function* () {
+        yield Buffer.from('PDF');
+        yield Buffer.from('DATA');
+      })(),
+      size: 7,
+      contentType: 'application/pdf',
+      fileName: 'a "b".pdf',
+    });
+    assert.deepEqual(result, { name: 'a.pdf', file: 'stored_a.pdf' });
+    assert.equal(request?.url, 'https://api.example.com/v1/organizations/org/attachment');
+    const boundary = /^multipart\/form-data; boundary=(.+)$/.exec(request?.contentType ?? '')?.[1];
+    assert.ok(boundary);
+    assert.equal(
+      request?.body,
+      `--${boundary}\r\nContent-Disposition: form-data; name="fileSize"\r\n\r\n7\r\n` +
+        `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="a _b_.pdf"\r\n` +
+        `Content-Type: application/pdf\r\n\r\nPDFDATA\r\n--${boundary}--\r\n`,
+    );
+  } finally {
+    globalThis.fetch = realFetch;
   }
 });

@@ -226,6 +226,17 @@ add(
 );
 
 add(
+  'post_statistics',
+  'How many posts are drafts, waiting for approval, scheduled (or being published), published and failed (also on some channels only) right now, and when the next scheduled post goes out (nextScheduledAt, epoch milliseconds).',
+  {
+    organizationId: ORG_ID,
+    channelId: optStr('Only posts of this channel.'),
+  },
+  READ,
+  (client, args) => client.get(postPath(args.organizationId, 'statistics'), { channelId: args.channelId }),
+);
+
+add(
   'post_media_upload',
   'Upload an image or video for a post from a public https address (JPEG, PNG, WebP or GIF, MP4 or MOV, up to 1 GB; the address has to report the file size). Returns the media with its id: pass it as media to post_create or post_schedule. An upload no post uses is removed after a while.',
   {
