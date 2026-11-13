@@ -24,6 +24,7 @@ import {
   documentProxy,
   extractBearerToken,
   protectedResourceMetadata,
+  serverUrl,
   wwwAuthenticate,
 } from './auth.js';
 import { createServer, SERVER_NAME, SERVER_VERSION } from './server.js';
@@ -68,6 +69,21 @@ app.get('/health', (_req: Request, res: Response) => {
 // Protected resource metadata (RFC 9728), also under the endpoint's path as hosts may ask for it
 app.get(['/.well-known/oauth-protected-resource', '/.well-known/oauth-protected-resource/*'], (_req: Request, res: Response) => {
   res.set('Cache-Control', 'public, max-age=3600').json(protectedResourceMetadata());
+});
+
+// MCP Server Card (SEP-1649): what this server is and where its endpoint is, without connecting
+app.get('/.well-known/mcp/server-card.json', (_req: Request, res: Response) => {
+  res.set('Cache-Control', 'public, max-age=3600').json({
+    $schema: 'https://static.modelcontextprotocol.io/schemas/mcp-server-card/v1.json',
+    version: '1.0',
+    serverInfo: { name: SERVER_NAME, title: 'FirstReply', version: SERVER_VERSION },
+    description:
+      'FirstReply as tools for an AI assistant: read and answer customer conversations, manage contacts, channels and the knowledge base, and plan social posts.',
+    documentationUrl: 'https://docs.firstreply.ai/developers/mcp-server',
+    transport: { type: 'streamable-http', endpoint: `${serverUrl()}${ENDPOINT_PATH}` },
+    authentication: { required: true, schemes: ['oauth2', 'bearer'] },
+    capabilities: { tools: {}, resources: {} },
+  });
 });
 
 const authorizationServerMetadata = documentProxy(`${apiUrl()}/.well-known/oauth-authorization-server`);

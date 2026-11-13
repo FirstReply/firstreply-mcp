@@ -263,6 +263,13 @@ describe('http', () => {
     assert.equal(server.registration_endpoint, `${apiUrl}/v1/oauth/register`);
   });
 
+  test('the server card names the server and its endpoint', async () => {
+    const card = (await (await fetch(`${baseUrl}/.well-known/mcp/server-card.json`)).json()) as Record<string, any>;
+    assert.equal(card.serverInfo.name, 'firstreply-mcp');
+    assert.match(card.serverInfo.version, /^\d+\.\d+\.\d+/);
+    assert.equal(card.transport.endpoint, 'https://mcp.example.test/');
+  });
+
   test('CORS preflight allows the 2026-07-28 headers', async () => {
     const response = await fetch(`${baseUrl}/`, {
       method: 'OPTIONS',

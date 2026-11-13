@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The hosted server publishes an MCP Server Card at
+  `/.well-known/mcp/server-card.json` (name, version, endpoint, sign-in).
 - `knowledge_source_create` (website and helpdesk sources),
   `knowledge_source_update` and `knowledge_source_delete`.
 - `post_statistics`: how many posts are in each state and when the next
