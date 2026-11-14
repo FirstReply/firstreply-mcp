@@ -80,7 +80,7 @@ add(
 
 add(
   'member_create',
-  'Add a member to an organization by email address. Requires organization admin permission.',
+  'Invite a member to an organization by email address. The person gets an invitation mail and joins once that address has a verified FirstReply account. Requires a signed-in manager, admin or owner: an organization API key cannot manage members.',
   {
     organizationId: ORG_ID,
     email: str('Email address of the person to add.'),
@@ -93,7 +93,7 @@ add(
 
 add(
   'member_update',
-  'Change the permission level of an organization member. Requires organization admin permission.',
+  'Change the permission level of an organization member (nobody grants a level above their own or changes their own). Requires a signed-in manager, admin or owner: an organization API key cannot manage members.',
   {
     organizationId: ORG_ID,
     memberId: str('The organization member id (see member_list).'),
@@ -105,7 +105,7 @@ add(
 
 add(
   'member_delete',
-  'Remove a member from an organization. Their assigned conversations stay in the organization. Requires organization admin permission.',
+  'Remove a member from an organization. Their assigned conversations stay in the organization. Requires a signed-in manager, admin or owner: an organization API key cannot manage members.',
   { organizationId: ORG_ID, memberId: str('The organization member id to remove.') },
   DESTRUCTIVE,
   async (client, args) => {
@@ -128,7 +128,7 @@ add(
 
 add(
   'api_key_create',
-  'Create a new named API key for an organization. The response contains the plaintext key exactly once: relay it to the user immediately and treat it as a secret; it cannot be retrieved later. Requires organization admin permission.',
+  'Create a new named API key for an organization. The response contains the plaintext key exactly once: relay it to the user immediately and treat it as a secret; it cannot be retrieved later. Requires a signed-in admin or owner: an organization API key cannot create API keys.',
   {
     organizationId: ORG_ID,
     name: str('A descriptive name for the key, e.g. the integration that will use it.'),
@@ -144,7 +144,7 @@ add(
 
 add(
   'api_key_delete',
-  'Delete (revoke) an API key of an organization. Integrations using the key stop working immediately, including this MCP server if the key it authenticates with is deleted. Requires organization admin permission.',
+  'Delete (revoke) an API key of an organization. Integrations using the key stop working immediately, including this MCP server if the key it authenticates with is deleted. Requires a signed-in admin or owner: an organization API key cannot delete API keys.',
   {
     organizationId: ORG_ID,
     apiKeyId: str('The id of the API key to delete (see api_key_list).'),

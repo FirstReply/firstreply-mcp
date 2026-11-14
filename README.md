@@ -28,12 +28,12 @@ customer or delete data are annotated as destructive.
 | `organization_usage` | Plan, trial state and channel / member counts against the limits |
 | `member_list` | List organization members |
 | `member_get` | Get one member |
-| `member_create` | Add a member by email with a permission level |
-| `member_update` | Change a member's permission level |
-| `member_delete` | Remove a member (destructive) |
+| `member_create` | Invite a member by email with a permission level (signed-in account only) |
+| `member_update` | Change a member's permission level (signed-in account only) |
+| `member_delete` | Remove a member (destructive, signed-in account only) |
 | `api_key_list` | List the organization's named API keys (metadata only) |
-| `api_key_create` | Create a named API key; plaintext returned once |
-| `api_key_delete` | Delete (revoke) an API key (destructive) |
+| `api_key_create` | Create a named API key; plaintext returned once (signed-in account only) |
+| `api_key_delete` | Delete (revoke) an API key (destructive, signed-in account only) |
 
 ### Channels
 
@@ -235,7 +235,10 @@ MCP server. The key is sent as `Authorization: Bearer`.
 
 API key requests run with the permissions of the organization owner: treat
 the key as a secret and rotate it by creating a new key and deleting the old
-one.
+one (in FirstReply, signed in). A key works with the organization's data, not
+with the account itself: it cannot invite, change or remove members, create or
+delete API keys, delete the organization or open the billing portal. Those
+tools need the account sign-in.
 
 A key only reaches its own organization: `organization_list` returns just
 that organization, and requests for any other organization are refused with
